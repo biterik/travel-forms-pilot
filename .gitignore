@@ -1,0 +1,24 @@
+# Personal data — never in the repo
+identity.yaml
+bonus_points.md
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python build/cache artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+
+# Office lockfiles and temp artifacts
+~$*.docx
+~$*.xlsx
+*.tmp
+.~lock.*
+
+# Trip folders (live outside the repo on the user's machine, never copy them in)
+*/yyyymmdd_*/
+*/20[0-9][0-9][01][0-9][0-3][0-9]_*/

@@ -1,0 +1,65 @@
+---
+# Trip status — moves through in order:
+# planned → submitted → approved → completed → filed → reimbursed
+status: planned
+
+# Key data
+ziel: ""                    # location, e.g. "Cargèse, France" or "Erlangen, Germany"
+event: ""                   # name of the event
+event_url: ""               # original URL of the conference / invitation page
+datum_start: YYYY-MM-DD     # trip start
+datum_ende: YYYY-MM-DD      # trip end
+abrechnungsfrist: YYYY-MM-DD  # trip end + 3 months (with advance: immediately)
+
+# Administrative data
+reisenummer: ""             # assigned by the Reisestelle, e.g. "DR6129"
+kostenstelle: W0405001
+reisezweck_kurz: ""         # one-line description for application and expense report
+
+# Bonus programmes — what this trip earned
+# (business-earned points must be reported to the Reisestelle)
+bonusprogramme:
+  bahnbonus_punkte:           # e.g. 220 (110 outbound + 110 return)
+  miles_and_more_meilen:      # e.g. 1480
+  gemeldet_an_reisestelle: false   # set to true once reported
+  notiz: ""                   # e.g. "outbound and return ICE 529/526 Flexpreis Business"
+---
+
+# {Trip title}
+
+## 1. Occasion
+
+<!-- Invitation, programme snapshot, URL reference. Path to snapshot files in `1_Invitation/`. -->
+
+## 2. Application
+
+<!--
+Approval date, trip-number assignment, special points.
+Files: `2_Application/<yyyymmdd>_<shortname>_Dienstreiseantrag.docx` + `_signedEB.pdf`.
+-->
+
+## 3. Booking
+
+<!--
+Train / flight / hotel bookings, order numbers, payment method (AirPlus corporate card vs. private).
+Files: `3_Booking/`.
+-->
+
+## 4. Daily log
+
+<!-- One sub-heading per day with YYYY-MM-DD (weekday) and notes. -->
+
+### YYYY-MM-DD (Day)
+
+## 5. Expense report
+
+<!--
+Receipts, times, exchange rates (for abroad), meals provided by third parties.
+File: `5_Expense_Report/<yyyymmdd>_<shortname>_Reiseabrechnung.docx`.
+-->
+
+## 6. Follow-up
+
+<!--
+Verify money received, verify bonus-point credit, file tax documents.
+-->

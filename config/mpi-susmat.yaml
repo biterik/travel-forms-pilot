@@ -1,0 +1,88 @@
+# Institutional constants — MPI for Sustainable Materials (formerly MPI Eisenforschung)
+# This file IS in the repo (no personal content). Other institutes adapt only this file.
+
+institut:
+  kurzname: MPI-SusMat
+  langname_offiziell: Max-Planck-Institut für Nachhaltige Materialien GmbH
+  langname_auf_formularen: Max-Planck Institut für Eisenforschung GmbH Düsseldorf
+  rechnungsadresse:
+    name: Max-Planck-Institut für Eisenforschung GmbH
+    strasse: Max-Planck-Str. 1
+    plz: 40237
+    ort: Düsseldorf
+
+mail:
+  travel: travel@mpi-susmat.de         # application, expense report, bonus-point report
+  invoice: invoice-eifo@gv.mpg.de      # conference fees, seminar invoices go directly here
+
+formulare:
+  antrag: templates/Dienstreiseantrag_Mitarbeitende_mit_A1.docx
+  abrechnung: templates/Reiseabrechnung_Vorlage.docx
+  trip_md: templates/trip.md.tmpl
+
+hausregeln:
+  hotel_inland_max_eur_ohne_begruendung: 70    # above this, a separate justification is required
+  parken_max_eur_pro_tag: 10
+  abrechnungsfrist_monate: 3                   # from trip end; with advance: immediately
+  antrag_einreichungsfrist_tage: 3             # at the latest before trip start
+  privatpkw_eur_pro_km_ohne_interesse: 0.20    # § 5 (1) BRKG
+  privatpkw_eur_pro_km_mit_interesse: 0.30     # § 5 (2) BRKG (clear with Reisestelle in advance)
+
+# Book only AFTER approval, otherwise private. Declare bonus programmes in the application;
+# business-earned bonus points may only be used for business and must be reported to the
+# Reisestelle.
+verbindliche_regeln:
+  - buchung_nach_genehmigung
+  - bonusprogramm_im_antrag_deklarieren
+  - bonusboni_dienstlich_einsetzen
+  - originalbelege_per_hauspost_mit_reisenummer
+  - a1_fuer_eu_auslandsreisen
+
+# EU countries that require an A1 posting certificate (per application form page 4)
+a1_eu_laender:
+  - {code: BE, de: Belgien,           en: Belgium}
+  - {code: BG, de: Bulgarien,         en: Bulgaria}
+  - {code: DK, de: Dänemark,          en: Denmark}
+  - {code: EE, de: Estland,           en: Estonia}
+  - {code: FI, de: Finnland,          en: Finland}
+  - {code: FR, de: Frankreich,        en: France}
+  - {code: GR, de: Griechenland,      en: Greece}
+  - {code: IE, de: Irland,            en: Ireland}
+  - {code: IS, de: Island,            en: Iceland}
+  - {code: IT, de: Italien,           en: Italy}
+  - {code: HR, de: Kroatien,          en: Croatia}
+  - {code: LV, de: Lettland,          en: Latvia}
+  - {code: LI, de: Liechtenstein,     en: Liechtenstein}
+  - {code: LT, de: Litauen,           en: Lithuania}
+  - {code: LU, de: Luxemburg,         en: Luxembourg}
+  - {code: MT, de: Malta,             en: Malta}
+  - {code: NL, de: Niederlande,       en: Netherlands}
+  - {code: NO, de: Norwegen,          en: Norway}
+  - {code: AT, de: Österreich,        en: Austria}
+  - {code: PL, de: Polen,             en: Poland}
+  - {code: PT, de: Portugal,          en: Portugal}
+  - {code: RO, de: Rumänien,          en: Romania}
+  - {code: SE, de: Schweden,          en: Sweden}
+  - {code: CH, de: Schweiz,           en: Switzerland}
+  - {code: SK, de: Slowakei,          en: Slovakia}
+  - {code: SI, de: Slowenien,         en: Slovenia}
+  - {code: ES, de: Spanien,           en: Spain}
+  - {code: CZ, de: Tschechien,        en: Czechia}
+  - {code: HU, de: Ungarn,            en: Hungary}
+  - {code: GB, de: Vereinigtes Königreich, en: United Kingdom}
+  - {code: CY, de: Zypern,            en: Cyprus}
+
+# Per-trip folder convention (relative to the trip folder):
+ordnerstruktur:
+  - 1_Invitation/       # invitation, programme snapshot, URL reference
+  - 2_Application/      # Dienstreiseantrag_<trip>.docx (+ A1 if EU)
+  - 3_Booking/          # confirmations, comparison offer if needed
+  - receipts/           # photos / scans from the iPhone
+  - 5_Expense_Report/   # Reiseabrechnung_<trip>.docx
+  - 6_Followup/         # money receipt, tax documents
+
+# Language settings
+sprache:
+  interaktion: en                # agent always replies in English
+  user_input_akzeptiert: [de, en]  # user may write in German or English
+  dokumente_default: de          # default for filling MPIE forms; asked once per session
