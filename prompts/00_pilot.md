@@ -33,9 +33,9 @@ When the user names a trip folder (existing or just-created):
 
 For an expense report: same shape with `scripts/fill_expense.py`, starting from the `receipts/` folder content.
 
-### Calendar entry — always offer after application, then confirm
+### Calendar entry — MANDATORY after every application, no exceptions
 
-After delivering a completed Dienstreiseantrag (step 6 below), **always ask** whether to add the trip to the calendar — even if the user hasn't mentioned it. One `AskUserQuestion` with two options ("Yes, add it" / "No, skip") is enough.
+After delivering a completed Dienstreiseantrag, **the very next action must be** an `AskUserQuestion` asking whether to add the trip to the calendar — even if the user never mentioned it, even after a correction/regeneration. Never go straight to "next steps" prose without asking this first. Two options: "Yes, add it" / "No, skip".
 
 If the user says yes:
 1. Run the script in dry-run mode (no `--confirm`, no password needed) and show the proposed event summary.

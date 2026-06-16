@@ -25,7 +25,7 @@ When the user mentions a trip folder (existing or just-created), the agent:
 3. **Pre-fill `trip.md` further** by reading the invitation / programme files: extract `event_url`, `datum_ende`, refine `ziel` and `event`, capture `reisezweck_kurz` (one-line). Update the YAML header. Show what was filled.
 4. **One batched `AskUserQuestion`** for whatever is still open — typically: document language (EN/DE), transport (Bahn/Flug/PKW), cost bearer (institute / partly external / fully external), justification if needed, A1 confirmation if EU. 3–4 questions, "Recommended" first.
 5. **Generate the application** via `scripts/fill_application.py`. Hand back the PDF path. **Do not render the PDF as an image and re-inspect it.** The user opens it in Preview.
-6. **Offer calendar entry.** Ask with one `AskUserQuestion` ("Add to calendar? Yes / No"). If yes:
+6. **Offer calendar entry — MANDATORY, never skip.** Immediately after presenting the PDF path, ask with one `AskUserQuestion` ("Add to calendar? Yes / No") — even if the user never mentioned the calendar, even after a correction/regeneration. Do not proceed to "next steps" text until this question has been asked. If yes:
    - Run `scripts/add_to_calendar.py <trip-folder> [--start HH:MM --end HH:MM]` (dry-run, no password needed) and show the proposed event summary.
    - Write a `push_calendar.command` file into the trip folder (see format below) and tell the user: **"Double-click `push_calendar.command` in Finder — it will pop up a password dialog and push the event. Your password never leaves your Mac."**
    - Do NOT attempt to collect the password in the LLM or pass it via environment variable.

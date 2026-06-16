@@ -39,6 +39,10 @@ This file grows with every trip that gets worked through. Entries are short and 
   - Truncation recipe: drop the index page (everything up to and including break 0), drop the cost-trigger disclaimer paragraph (incl. break 1), drop the A1 page and the EU country list — only `<w:sectPr>` stays. Trim trailing paragraphs.
   - Result: 0 page breaks in the DOCX, 1 page in the PDF.
 
+## Calendar entry — MANDATORY after every application
+
+**After every completed Dienstreiseantrag, always ask about the calendar — no exceptions, even if the user didn't mention it.** This must be the very next thing after presenting the PDF. Use `AskUserQuestion` with "Yes, add it" / "No, skip". If yes: run dry-run, write `push_calendar.command`, tell user to double-click it. Do NOT skip this step even after corrections/regenerations — ask once after the final PDF is delivered.
+
 ## Session startup — CLAUDE.md is mandatory
 
 - **The pilot only works correctly when `CLAUDE.md` exists at the workspace root** (`TRAVEL-WORKFLOW-DEVEL/CLAUDE.md`). Without it, Claude starts blind: ignores SKILL.md, the scripts, and this file, and will try to do everything by hand (editing XML directly, reinventing the workflow, etc.).
@@ -49,7 +53,7 @@ This file grows with every trip that gets worked through. Entries are short and 
 
 ### DFG-Jahresversammlung Bonn (June 2026)
 - **Cost bearer: institute (W0405001)** — unlike DFG committee/working-group trips (e.g., DFG Fachforum MatWerk, DFG Darmstadt Jan 2026) which are fully externally funded by DFG, the annual assembly is attended as a DFG member institution representative and charged to the institute. Do not assume "DFG event = externally funded."
-- The trip ticket was for **Festliche Veranstaltungen** (evening events only: Communicator-Preis Mo 29.6., Festveranstaltung Di 30.6.) — travel was Di 30.6. only, returning Mi 01.07. at midnight.
+- The trip ticket was for **Festliche Veranstaltungen** (evening events only: Communicator-Preis Mo 29.6., Festveranstaltung Di 30.6.) — travel was Di 30.6. only, same-day return (event ends ~23:00, no hotel). Di 30.06.2026 = departure AND return date.
 - Hotel + Tagegeld checked (MPI pays both); no external cost bearer.
 - Bahn; BahnBonus applies.
 
