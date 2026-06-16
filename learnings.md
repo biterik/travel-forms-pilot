@@ -48,6 +48,12 @@ This file grows with every trip that gets worked through. Entries are short and 
 - At IESC schools the host typically covers accommodation and meals → mark "partly externally borne" on the application; **at the expense-report stage** then reduce per diems for meals received.
 - When invited as a lecturer, no conference fee → leave the "seminar fee" checkbox empty.
 
+## Date sanity-checking
+
+- **Always show the weekday with every date** — e.g. "Mo, 29.6.2026". Users often give a weekday abbreviation ("Die") with the date; compute the real weekday and flag mismatches before filling any form.
+- **"Return at 00:00" = next calendar day.** Call this out so it's clear the end date is different from the start date.
+- Real example (DFG Bonn 2026): user said "Die 29.6.", but 29.6.2026 is a Monday (Mo). The festive event was on Dienstag 30.6. — the wrong date got into the application and needed correction.
+
 ## Trip folder location
 
 - **Trip folders live in `TRAVEL-FORMS/`, not inside `TRAVEL-WORKFLOW-DEVEL/`.** The repo is in `TRAVEL-WORKFLOW-DEVEL/travel-forms-pilot/`; trip folders are siblings of `TRAVEL-WORKFLOW-DEVEL/` inside `TRAVEL-FORMS/`.

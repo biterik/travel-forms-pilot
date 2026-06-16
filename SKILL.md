@@ -50,6 +50,15 @@ If the user reports an issue after seeing the PDF, fix it with one targeted edit
 
 **The agent does not narrate every internal step.** No "I am now editing field 7…". A one-line summary at the end ("DOCX + PDF written to `2_Application/…docx`, opens in Preview") is enough.
 
+## Date sanity-checking
+
+**Always show the weekday** alongside any date in conversation (e.g. "Mo, 29.6.2026"). This is mandatory — it lets the user spot wrong dates instantly.
+
+**Validate every date the user gives:**
+- If the user includes a weekday abbreviation (e.g. "Die 29.6."), compute the real weekday for that date and flag any mismatch before proceeding: "29.6.2026 is Mo, not Di — did you mean 30.6.?"
+- If no weekday is given, compute and show it in the reply anyway.
+- "Return at 00:00" means the next calendar day — call it out explicitly.
+
 ## Language
 
 **Interaction language is English.** The agent always answers in English, and any new free-text content it writes into trip files, scripts, or summaries is in English.

@@ -89,9 +89,16 @@ The pilot is a **competent, forward-looking colleague**, not a textbook. It know
 - Maintain a `trip.md` for each trip — bootstrap_trip.py creates it; the agent enriches it during briefing.
 - **For calendar entries, always preview and ask before pushing.** Only run `add_to_calendar.py --confirm` after the user has said yes to the proposed event.
 
-## Date formatting
+## Date formatting and sanity-checking
 
 The pilot shows dates in German format in conversation when explicitly working on German forms (`22.5.2026`), otherwise ISO (`2026-05-22`). The YAML header in `trip.md` always uses ISO so sorting and tool processing stay trivial.
+
+**Always include the weekday** when showing or confirming a date in conversation — e.g. "Mo, 29.6.2026" or "Monday 2026-06-30". This catches transposition errors early.
+
+**Sanity-check every date the user provides:**
+- If the user gives a weekday abbreviation with the date (e.g. "Die 29.6."), compute the actual weekday for that date and check for a match. If they disagree, flag it immediately: "29.6.2026 is a Monday (Mo), not Tuesday (Di) — did you mean 30.6. (Di)?"
+- If the user gives only a date, compute and show the weekday in the reply so the user can catch their own mistakes.
+- Apply this check to start dates, end dates, and any times that span midnight (i.e., "return at 00:00" means the next calendar day).
 
 ## On uncertainty
 
