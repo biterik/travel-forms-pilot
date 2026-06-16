@@ -119,7 +119,7 @@ travel-forms-pilot/
 
 The pilot expects two files **next to** (not inside) the repo, on your local machine:
 
-- `identity.yaml` — your personnel number, cost center, bonus-programme membership, and (for the optional calendar feature) your CalDAV login + app password in a `kalender:` block.
+- `identity.yaml` — your personnel number, cost center, bonus-programme membership, and (for the optional calendar feature) your CalDAV login in a `kalender:` block. Leave `app_password` blank — the calendar script prompts for it at runtime.
 - `bonus_points.md` — running balance of business-earned points awaiting batch reporting.
 
 A sample `identity.yaml` is in the wiki / can be inferred from the comments in `config/mpi-susmat.yaml`. Plus your actual trip folders (`yyyymmdd_LOCATION_EVENT/`) sit elsewhere on your disk. The `.gitignore` here is set up so that if you accidentally drop these inside the repo, they won't get committed.
@@ -144,7 +144,7 @@ After your trip, drop the receipt photos into the same folder and say "let's do 
 
 ## Calendar entry (optional)
 
-On request, the pilot can add a trip to your calendar via **CalDAV** — set up for Kerio Connect (the MPIE mail/groupware server), but any CalDAV server works. It's on-demand and confirmation-first: the pilot previews the event, asks, and only pushes after you say yes.
+After generating a Dienstreiseantrag, the pilot always offers to add the trip to your calendar. It's confirmation-first: it previews the event and only pushes after you say yes.
 
 ```bash
 pip install caldav icalendar --break-system-packages
@@ -160,7 +160,13 @@ python scripts/add_to_calendar.py <trip-folder> --start "2026-09-01 14:00" --end
 
 Without `--confirm` the script only prints what it would create. The event UID is derived from the trip-folder name, so re-running **updates** the same event instead of duplicating it. `--reminder 0|30m|2h|1d` overrides the reminder.
 
-Server and the CalDAV URL pattern are institutional (`config/<institute>.yaml`, `kalender:` block); your login and a CalDAV **app password** are personal and live in `identity.yaml` (`kalender:`) — never in the repo. Behaviour is described in `prompts/60_calendar.md`.
+Server and CalDAV URL are institutional (`config/<institute>.yaml`, `kalender:` block); your login is personal and lives in `identity.yaml` (`kalender:`) — never in the repo.
+
+**Password handling:** leave `app_password` blank in `identity.yaml`. The LLM agent writes a `push_calendar.command` file (macOS) into the trip folder and tells you to double-click it. The script then runs locally on your Mac and shows a native password dialog (`osascript`) — your password never leaves your machine and is never seen by the LLM. On Linux the dialog uses `zenity` or `kdialog` (falling back to `tkinter`, then `getpass`). On Windows it uses `tkinter`.
+
+> **Kerio Connect + Active Directory note:** Kerio app passwords do not work for AD-imported accounts due to a known bug in the Active Directory Extension for Kerio Connect (KADE). Use your regular MPIE password when prompted. The fix requires the MPIE IT admin to update KADE on the AD server.
+
+Behaviour is described in `prompts/60_calendar.md`.
 
 Per-trip folder convention (the agent maintains this for you):
 

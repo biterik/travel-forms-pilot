@@ -48,6 +48,17 @@ This file grows with every trip that gets worked through. Entries are short and 
 - At IESC schools the host typically covers accommodation and meals → mark "partly externally borne" on the application; **at the expense-report stage** then reduce per diems for meals received.
 - When invited as a lecturer, no conference fee → leave the "seminar fee" checkbox empty.
 
+## Trip folder location
+
+- **Trip folders live in `TRAVEL-FORMS/`, not inside `TRAVEL-WORKFLOW-DEVEL/`.** The repo is in `TRAVEL-WORKFLOW-DEVEL/travel-forms-pilot/`; trip folders are siblings of `TRAVEL-WORKFLOW-DEVEL/` inside `TRAVEL-FORMS/`.
+- Always check whether the named folder already exists before running `bootstrap_trip.py`. If it doesn't exist yet, ask the user where to create it — never assume it belongs in the workspace root.
+
+## Kerio Connect calendar authentication
+
+- **App passwords do not work for AD-imported accounts** (known KADE bug). Both old and freshly-generated app passwords return 401 for CalDAV PROPFIND, even though credentials are sent correctly.
+- **Workaround:** leave `app_password` blank in `identity.yaml`; `add_to_calendar.py` now prompts via `getpass` at runtime. The user enters their regular MPIE password — never stored anywhere.
+- The fix (updating KADE on the AD server) requires MPIE IT. Until then, runtime prompt is the correct flow.
+
 ## Open questions / next improvements
 
 - Centralize `identity.yaml` — currently lives in `TRAVEL-WORKFLOW-DEVEL/`, should later move to `~/.travel-forms-pilot/identity.yaml` per the concept.

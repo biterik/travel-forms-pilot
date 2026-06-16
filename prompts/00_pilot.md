@@ -33,9 +33,19 @@ When the user names a trip folder (existing or just-created):
 
 For an expense report: same shape with `scripts/fill_expense.py`, starting from the `receipts/` folder content.
 
-### Calendar entry — on demand, confirm first
+### Calendar entry — always offer after application, then confirm
 
-When (and only when) the user asks to put a trip in the calendar ("add this to my calendar", "trag das in den Kalender ein"), follow `prompts/60_calendar.md`: run `scripts/add_to_calendar.py <trip-folder>` to preview, show the proposed event, **ask back**, and only push with `--confirm` after an explicit yes. Never add calendar entries automatically as part of another flow.
+After delivering a completed Dienstreiseantrag (step 6 below), **always ask** whether to add the trip to the calendar — even if the user hasn't mentioned it. One `AskUserQuestion` with two options ("Yes, add it" / "No, skip") is enough.
+
+If the user says yes:
+1. Run the script in dry-run mode (no `--confirm`, no password needed) and show the proposed event summary.
+2. Write a `push_calendar.command` file into the trip folder (see SKILL.md step 6 for the exact format). Make it executable (`chmod +x`).
+3. Tell the user: **"Double-click `push_calendar.command` in Finder — a password dialog will appear and the event will be pushed. Your password never leaves your Mac."**
+4. Do NOT ask for the password in the LLM. Do NOT pass it via environment variable. The script handles it natively on the user's machine.
+
+If the user says no: skip silently.
+
+The user may also ask for a calendar entry at any other point in the conversation ("trag das in den Kalender ein") — same flow.
 
 ### File → subfolder rules of thumb
 

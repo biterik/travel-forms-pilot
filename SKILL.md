@@ -19,11 +19,32 @@ Everything else — subfolder scaffolding, copying `trip.md`, sorting the droppe
 
 When the user mentions a trip folder (existing or just-created), the agent:
 
-1. **Runs `scripts/bootstrap_trip.py <trip-folder>`** immediately. This creates `1_Invitation/`, `2_Application/`, `3_Booking/`, `receipts/`, `5_Expense_Report/`, `6_Followup/` if they're missing, copies `templates/trip.md.tmpl` to `<trip-folder>/trip.md` if it's missing, and pre-fills the YAML header with the date / location / event guessed from the folder name. Idempotent — safe to re-run.
+1. **Verifies the folder path first.** Check whether the folder already exists in the connected workspace(s). If it does not exist anywhere, do NOT create it inside the repo or the workspace root — ask the user where to create it. Trip folders belong in the user's trip parent directory (e.g. `TRAVEL-FORMS/`), not inside `TRAVEL-WORKFLOW-DEVEL/`.
+2. **Runs `scripts/bootstrap_trip.py <trip-folder>`** immediately. This creates `1_Invitation/`, `2_Application/`, `3_Booking/`, `receipts/`, `5_Expense_Report/`, `6_Followup/` if they're missing, copies `templates/trip.md.tmpl` to `<trip-folder>/trip.md` if it's missing, and pre-fills the YAML header with the date / location / event guessed from the folder name. Idempotent — safe to re-run.
 2. **Lists the loose files** at the top level (the script prints these). For each, inspect the filename (and if needed open it with `Read`) and **propose moves** into the right subfolder. See `prompts/00_pilot.md` for the file → subfolder rules of thumb. Present moves as one short table; user confirms with "ok" or corrects in one reply; agent runs the `mv` commands.
 3. **Pre-fill `trip.md` further** by reading the invitation / programme files: extract `event_url`, `datum_ende`, refine `ziel` and `event`, capture `reisezweck_kurz` (one-line). Update the YAML header. Show what was filled.
 4. **One batched `AskUserQuestion`** for whatever is still open — typically: document language (EN/DE), transport (Bahn/Flug/PKW), cost bearer (institute / partly external / fully external), justification if needed, A1 confirmation if EU. 3–4 questions, "Recommended" first.
 5. **Generate the application** via `scripts/fill_application.py`. Hand back the PDF path. **Do not render the PDF as an image and re-inspect it.** The user opens it in Preview.
+6. **Offer calendar entry.** Ask with one `AskUserQuestion` ("Add to calendar? Yes / No"). If yes:
+   - Run `scripts/add_to_calendar.py <trip-folder> [--start HH:MM --end HH:MM]` (dry-run, no password needed) and show the proposed event summary.
+   - Write a `push_calendar.command` file into the trip folder (see format below) and tell the user: **"Double-click `push_calendar.command` in Finder — it will pop up a password dialog and push the event. Your password never leaves your Mac."**
+   - Do NOT attempt to collect the password in the LLM or pass it via environment variable.
+
+   `push_calendar.command` format (macOS executable shell script):
+   ```bash
+   #!/bin/bash
+   # Double-click in Finder (or run in Terminal) to push this trip to your calendar.
+   # A password dialog will appear — enter your MPIE password there.
+   set -e
+   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+   REPO="$SCRIPT_DIR/../TRAVEL-WORKFLOW-DEVEL/travel-forms-pilot"
+   python3 "$REPO/scripts/add_to_calendar.py" \
+     "$SCRIPT_DIR" \
+     --start "HH:MM" --end "YYYY-MM-DD HH:MM" \
+     --identity "$REPO/../identity.yaml" \
+     --confirm
+   ```
+   Fill in the actual `--start` / `--end` values. After writing, run `chmod +x <path>/push_calendar.command` so it's executable.
 
 If the user reports an issue after seeing the PDF, fix it with one targeted edit (regenerate from the same config with the changed field).
 

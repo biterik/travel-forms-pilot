@@ -46,8 +46,88 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import platform
+import subprocess
 import sys
 from pathlib import Path
+
+
+def _ask_password_gui(prompt: str) -> str:
+    """Show a native GUI password dialog without echoing input.
+
+    Platform strategy:
+      macOS   → osascript  (native Cocoa sheet, hidden input)
+      Linux   → zenity → kdialog → tkinter → getpass fallback
+      Windows → tkinter   → getpass fallback
+
+    The password is never written to any file or environment variable.
+    """
+    system = platform.system()
+
+    if system == "Darwin":
+        script = (
+            f'display dialog "{prompt}" '
+            f'default answer "" with hidden answer '
+            f'buttons {{"Cancel", "OK"}} default button "OK" '
+            f'with title "Travel Forms Pilot"'
+        )
+        try:
+            r = subprocess.run(["osascript", "-e", script],
+                               capture_output=True, text=True, timeout=120)
+            if r.returncode != 0:
+                sys.exit("Password entry cancelled.")
+            for part in r.stdout.strip().split(", "):
+                if part.startswith("text returned:"):
+                    return part[len("text returned:"):]
+            sys.exit("Could not parse osascript response.")
+        except FileNotFoundError:
+            pass  # osascript missing — fall through
+
+    elif system == "Windows":
+        try:
+            import tkinter as tk
+            from tkinter import simpledialog
+            root = tk.Tk()
+            root.withdraw()
+            root.wm_attributes("-topmost", True)
+            pw = simpledialog.askstring("Travel Forms Pilot", prompt,
+                                        show="*", parent=root)
+            root.destroy()
+            if pw is None:
+                sys.exit("Password entry cancelled.")
+            return pw
+        except Exception:
+            pass  # tkinter unavailable — fall through
+
+    else:  # Linux
+        for cmd in (
+            ["zenity", "--password", "--title=Travel Forms Pilot"],
+            ["kdialog", "--password", prompt, "--title", "Travel Forms Pilot"],
+        ):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if r.returncode == 0:
+                    return r.stdout.rstrip("\n")
+                sys.exit("Password entry cancelled.")
+            except FileNotFoundError:
+                continue
+        try:
+            import tkinter as tk
+            from tkinter import simpledialog
+            root = tk.Tk()
+            root.withdraw()
+            pw = simpledialog.askstring("Travel Forms Pilot", prompt,
+                                        show="*", parent=root)
+            root.destroy()
+            if pw is None:
+                sys.exit("Password entry cancelled.")
+            return pw
+        except Exception:
+            pass  # fall through to getpass
+
+    # Last resort: terminal prompt (hidden input)
+    import getpass
+    return getpass.getpass(f"{prompt}: ")
 
 try:
     import yaml
@@ -295,13 +375,12 @@ def push_to_caldav(settings: dict, ical_text: str) -> str:
         sys.stderr.write("Missing dependency: pip install caldav --break-system-packages\n")
         sys.exit(2)
 
-    url, login, pw = settings["caldav_url"], settings["login"], settings["app_password"]
-    for k, v in (("caldav_url", url), ("login", login), ("app_password", pw)):
+    url, login, pw = settings["caldav_url"], settings["login"], settings.get("app_password")
+    for k, v in (("caldav_url", url), ("login", login)):
         if not v:
             sys.exit(f"Calendar setting `{k}` is missing — set it in identity.yaml `kalender:`.")
-    if str(pw).startswith("PASTE_"):
-        sys.exit("app_password is still the placeholder — paste your Kerio app password "
-                 "into identity.yaml `kalender:`.")
+    if not pw or str(pw).startswith("PASTE_"):
+        pw = _ask_password_gui(f"Kerio password for {login}:")
 
     client = caldav.DAVClient(url=url, username=login, password=pw)
     principal = client.principal()
