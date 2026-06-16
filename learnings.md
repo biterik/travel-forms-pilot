@@ -80,6 +80,7 @@ This file grows with every trip that gets worked through. Entries are short and 
 - **App passwords do not work for AD-imported accounts** (known KADE bug). Both old and freshly-generated app passwords return 401 for CalDAV PROPFIND, even though credentials are sent correctly.
 - **Workaround:** leave `app_password` blank in `identity.yaml`; `add_to_calendar.py` now prompts via `getpass` at runtime. The user enters their regular MPIE password — never stored anywhere.
 - The fix (updating KADE on the AD server) requires MPIE IT. Until then, runtime prompt is the correct flow.
+- **Calendar target is the shared `CM_Absence` calendar** (owned by `cm-office`, shared to Erik with write access) — not Erik's personal calendar. Configured in `identity.yaml` `kalender:` via `calendar_name: CM_Absence` + `shared_owner: cm-office`. `add_to_calendar.py` searches Erik's own calendars first, then the owner's home. Use `--list-calendars` to confirm visibility / grab the exact URL (paste into `calendar_url:` if name-matching fails), and `--delete --confirm` to remove an event.
 
 ## Open questions / next improvements
 

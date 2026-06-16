@@ -174,6 +174,11 @@ def resolve_calendar_settings(args, identity: dict, config: dict) -> dict:
         "login": args.login or id_cal.get("login"),
         "app_password": id_cal.get("app_password"),
         "calendar_name": args.calendar_name or id_cal.get("calendar_name") or pick("calendar_name"),
+        # Full collection URL of a shared/other calendar (highest priority target).
+        "calendar_url": args.calendar_url or id_cal.get("calendar_url") or pick("calendar_url"),
+        # Login of another user who owns a calendar shared TO you (e.g. "cm-office"
+        # owns "CM_Absence"). Lets the script discover calendars in that user's home.
+        "shared_owner": args.shared_owner or id_cal.get("shared_owner") or pick("shared_owner"),
         "alarm_days_before": id_cal.get("alarm_days_before", pick("alarm_days_before", 1)),
     }
     if not settings["caldav_url"]:
@@ -291,8 +296,14 @@ def resolve_window(header: dict, start_arg, end_arg):
 
 # ----------------------------------------------------------------------------- event build
 
-def build_event(header: dict, trip_folder: Path, start, end, all_day: bool, reminder):
-    """Return (ical_text, summary, display_when, uid)."""
+def build_event(header: dict, trip_folder: Path, start, end, all_day: bool, reminder,
+                person: str = ""):
+    """Return (ical_text, summary, display_when, uid).
+
+    Summary format (for the shared CM_Absence calendar):
+        "<Person>: @<event>, <location>"
+    e.g. "Erik: @DFG-Jahresversammlung 2026, Bonn, Deutschland"
+    """
     try:
         from icalendar import Calendar, Event, Alarm
     except ImportError:
@@ -302,12 +313,12 @@ def build_event(header: dict, trip_folder: Path, start, end, all_day: bool, remi
 
     event_name = (header.get("event") or "").strip()
     ziel = (header.get("ziel") or "").strip()
+    person = (person or "").strip()
 
-    summary = "Dienstreise"
-    if event_name:
-        summary += f": {event_name}"
+    summary = f"{person}: " if person else ""
+    summary += f"@{event_name}" if event_name else "@Dienstreise"
     if ziel:
-        summary += f" ({ziel})"
+        summary += f", {ziel}"
 
     uid = f"travel-forms-pilot-{trip_folder.name}@mpie.de"
 
@@ -366,9 +377,41 @@ def build_event(header: dict, trip_folder: Path, start, end, all_day: bool, remi
     return cal.to_ical().decode("utf-8"), summary, display_when, uid
 
 
-# ----------------------------------------------------------------------------- upload
+# ----------------------------------------------------------------------------- calendar discovery
 
-def push_to_caldav(settings: dict, ical_text: str) -> str:
+def _owner_home_url(caldav_url: str, owner: str) -> str:
+    """Derive another user's calendar-home URL by swapping the login segment.
+
+    e.g. https://host/caldav/users/example.org/jdoe  +  owner 'team-office'
+      -> https://host/caldav/users/example.org/team-office
+    """
+    base = caldav_url.rstrip("/")
+    parent = base.rsplit("/", 1)[0]
+    return f"{parent}/{owner}"
+
+
+def _cal_name(c) -> str:
+    """Best-effort display name for a caldav.Calendar object."""
+    getter = getattr(c, "get_display_name", None)
+    if callable(getter):
+        try:
+            name = getter()
+            if name:
+                return str(name)
+        except Exception:
+            pass
+    try:
+        props = c.get_properties(["{DAV:}displayname"]) or {}
+        name = props.get("{DAV:}displayname")
+        if name:
+            return str(name)
+    except Exception:
+        pass
+    return str(getattr(c, "name", None) or "?")
+
+
+def _connect(settings: dict):
+    """Build an authenticated DAVClient (prompts for the password if needed)."""
     try:
         import caldav
     except ImportError:
@@ -381,28 +424,109 @@ def push_to_caldav(settings: dict, ical_text: str) -> str:
             sys.exit(f"Calendar setting `{k}` is missing — set it in identity.yaml `kalender:`.")
     if not pw or str(pw).startswith("PASTE_"):
         pw = _ask_password_gui(f"Kerio password for {login}:")
+    return caldav.DAVClient(url=url, username=login, password=pw)
 
-    client = caldav.DAVClient(url=url, username=login, password=pw)
-    principal = client.principal()
-    calendars = principal.calendars()
+
+def _discover_calendars(client, settings: dict):
+    """Return a list of (source, caldav.Calendar) candidates.
+
+    Sources: the logged-in user's own home, plus the shared owner's home
+    (e.g. cm-office) if `shared_owner` is configured. Shared calendars that
+    you have subscribed to often also appear directly in your own home, so
+    both are searched.
+    """
+    import caldav  # already importable past _connect
+
+    candidates = []
+    try:
+        for c in client.principal().calendars():
+            candidates.append(("own", c))
+    except Exception as e:
+        sys.stderr.write(f"Warning: could not list your own calendars: {e}\n")
+
+    owner = settings.get("shared_owner")
+    if owner:
+        owner_home = _owner_home_url(settings["caldav_url"], owner)
+        try:
+            owner_principal = caldav.Principal(client=client, url=owner_home)
+            for c in owner_principal.calendars():
+                candidates.append((f"shared:{owner}", c))
+        except Exception as e:
+            sys.stderr.write(
+                f"Warning: could not list {owner}'s calendars at {owner_home}: {e}\n")
+    return candidates
+
+
+def _find_calendar(client, settings: dict):
+    """Resolve the target calendar object according to the settings.
+
+    Priority: explicit calendar_url > calendar_name (searched across own +
+    shared-owner homes) > first own calendar.
+    """
+    # 1. Explicit full collection URL wins.
+    cal_url = settings.get("calendar_url")
+    if cal_url:
+        return client.calendar(url=cal_url)
+
+    candidates = _discover_calendars(client, settings)
     wanted = settings.get("calendar_name")
-    calendar = None
-    if wanted:
-        for c in calendars:
-            name = getattr(c, "name", None) or (c.get_properties() or {}).get("{DAV:}displayname")
-            if name and str(name).strip().lower() == str(wanted).strip().lower():
-                calendar = c
-                break
-        if calendar is None:
-            names = ", ".join(str(getattr(c, "name", "?")) for c in calendars)
-            sys.exit(f"Calendar named {wanted!r} not found. Available: {names}")
-    else:
-        if not calendars:
-            sys.exit("No calendars found for this principal.")
-        calendar = calendars[0]
 
+    if wanted:
+        for _src, c in candidates:
+            if _cal_name(c).strip().lower() == str(wanted).strip().lower():
+                return c
+        avail = ", ".join(f"{_cal_name(c)} [{src}]" for src, c in candidates) or "(none)"
+        sys.exit(f"Calendar named {wanted!r} not found. Available: {avail}\n"
+                 f"If it is a shared calendar, set `shared_owner:` (its owner's login) "
+                 f"or `calendar_url:` (its full CalDAV URL) in identity.yaml `kalender:`.")
+
+    own = [c for src, c in candidates if src == "own"]
+    if not own:
+        sys.exit("No calendars found for this principal.")
+    return own[0]
+
+
+def list_calendars(settings: dict) -> None:
+    """Print every calendar the logged-in user can see (own + shared owner)."""
+    client = _connect(settings)
+    candidates = _discover_calendars(client, settings)
+    if not candidates:
+        print("No calendars found.")
+        return
+    print("Calendars visible to", settings["login"])
+    print("-" * 60)
+    for src, c in candidates:
+        name = _cal_name(c)
+        url = str(getattr(c, "url", "?"))
+        marker = "  <-- target" if (settings.get("calendar_name") and
+                                     name.strip().lower() ==
+                                     str(settings["calendar_name"]).strip().lower()) else ""
+        print(f"  [{src}] {name}{marker}")
+        print(f"        {url}")
+    print("\nTip: copy the URL of the calendar you want into identity.yaml "
+          "`kalender: calendar_url:` for the most reliable targeting.")
+
+
+# ----------------------------------------------------------------------------- upload / delete
+
+def push_to_caldav(settings: dict, ical_text: str) -> str:
+    client = _connect(settings)
+    calendar = _find_calendar(client, settings)
     calendar.save_event(ical_text)  # UID-based upsert (create or update)
-    return getattr(calendar, "name", None) or "default calendar"
+    return _cal_name(calendar)
+
+
+def delete_from_caldav(settings: dict, uid: str) -> str:
+    client = _connect(settings)
+    calendar = _find_calendar(client, settings)
+    try:
+        ev = calendar.event_by_uid(uid)
+    except Exception:
+        ev = None
+    if ev is None:
+        return f"no event with UID {uid} (nothing to delete) in {_cal_name(calendar)}"
+    ev.delete()
+    return f"deleted UID {uid} from {_cal_name(calendar)}"
 
 
 # ----------------------------------------------------------------------------- main
@@ -410,9 +534,17 @@ def push_to_caldav(settings: dict, ical_text: str) -> str:
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("trip_folder", help="Path to the trip folder (containing trip.md).")
+    ap.add_argument("trip_folder", nargs="?", default=None,
+                    help="Path to the trip folder (containing trip.md). "
+                         "Optional when using --list-calendars.")
     ap.add_argument("--confirm", action="store_true",
                     help="Actually push to the server. Without it the script only previews.")
+    ap.add_argument("--list-calendars", action="store_true",
+                    help="Connect and print every calendar you can see (own + shared owner), "
+                         "then exit. Useful to find the URL/name of a shared calendar.")
+    ap.add_argument("--delete", action="store_true",
+                    help="Delete this trip's event (by UID) from the target calendar. "
+                         "Needs --confirm. Useful to clean up after a test.")
     ap.add_argument("--start", default=None,
                     help="Override start: date, 'date HH:MM', or HH:MM. A time -> timed event.")
     ap.add_argument("--end", default=None,
@@ -423,11 +555,29 @@ def main():
     ap.add_argument("--login", default=None, help="Override the login name.")
     ap.add_argument("--calendar-name", default=None,
                     help="Target calendar display name (default: principal's first calendar).")
+    ap.add_argument("--calendar-url", default=None,
+                    help="Full CalDAV URL of the target calendar collection (for shared "
+                         "calendars). Highest priority — overrides --calendar-name.")
+    ap.add_argument("--shared-owner", default=None,
+                    help="Login of another user who owns a calendar shared to you "
+                         "(e.g. 'cm-office' for the CM_Absence calendar).")
     ap.add_argument("--identity", default=str(DEFAULT_IDENTITY),
                     help="Path to identity.yaml (default: one level above the repo).")
     ap.add_argument("--config", default=str(DEFAULT_CONFIG),
                     help="Path to config/mpi-susmat.yaml.")
     args = ap.parse_args()
+
+    identity = load_yaml(Path(args.identity))
+    config = load_yaml(Path(args.config))
+    settings = resolve_calendar_settings(args, identity, config)
+
+    # --- list-calendars mode: no trip needed, connect and print, then exit.
+    if args.list_calendars:
+        list_calendars(settings)
+        return
+
+    if not args.trip_folder:
+        sys.exit("Need a trip folder (or use --list-calendars).")
 
     trip = Path(args.trip_folder).resolve()
     trip_md = trip / "trip.md"
@@ -435,9 +585,17 @@ def main():
         sys.exit(f"No trip.md in {trip}. Run bootstrap_trip.py first.")
 
     header = parse_trip_md(trip_md)
-    identity = load_yaml(Path(args.identity))
-    config = load_yaml(Path(args.config))
-    settings = resolve_calendar_settings(args, identity, config)
+
+    # --- delete mode: remove this trip's event by UID, then exit.
+    if args.delete:
+        uid = f"travel-forms-pilot-{trip.name}@mpie.de"
+        print(f"Delete request for UID {uid}")
+        print(f"  Calendar: {settings.get('calendar_name') or settings.get('calendar_url') or '(default)'}")
+        if not args.confirm:
+            print("\nDRY-RUN — nothing deleted. Re-run with --delete --confirm to remove it.")
+            return
+        print("\n" + delete_from_caldav(settings, uid))
+        return
 
     start, end, all_day = resolve_window(header, args.start, args.end)
 
@@ -447,8 +605,9 @@ def main():
         days = settings.get("alarm_days_before", 1)
         reminder = dt.timedelta(days=int(days)) if days and int(days) > 0 else None
 
+    person = (identity.get("vorname") or "").strip()
     ical_text, summary, display_when, uid = build_event(
-        header, trip, start, end, all_day, reminder)
+        header, trip, start, end, all_day, reminder, person=person)
 
     print("Proposed calendar event")
     print("-----------------------")
@@ -465,7 +624,12 @@ def main():
                  else f"{total // 60}m")
         print(f"  Reminder: {human} before start")
     print(f"  UID     : {uid}  (re-runs update this event, no duplicate)")
-    print(f"  Calendar: {settings.get('caldav_url') or '(unset — set in identity.yaml)'}")
+    target = (settings.get("calendar_url")
+              or settings.get("calendar_name")
+              or "(default — your first calendar)")
+    via = f" (shared, owner {settings['shared_owner']})" if settings.get("shared_owner") else ""
+    print(f"  Calendar: {target}{via}")
+    print(f"  Server  : {settings.get('caldav_url') or '(unset — set in identity.yaml)'}")
 
     if not args.confirm:
         print("\nDRY-RUN — nothing sent. Re-run with --confirm to push to the calendar.")

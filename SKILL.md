@@ -43,6 +43,9 @@ When the user mentions a trip folder (existing or just-created), the agent:
      --start "HH:MM" --end "YYYY-MM-DD HH:MM" \
      --identity "$REPO/../identity.yaml" \
      --confirm
+   # Auto-close the Terminal window when done (detached -> no "terminate process" prompt).
+   ( sleep 0.2; osascript -e "tell application \"Terminal\" to close (every window whose name contains \"$(basename "$0")\")" ) >/dev/null 2>&1 &
+   exit 0
    ```
    Fill in the actual `--start` / `--end` values. After writing, run `chmod +x <path>/push_calendar.command` so it's executable.
 

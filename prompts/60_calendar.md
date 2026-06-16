@@ -61,6 +61,12 @@ silently.
 - All-day block by default (DTEND is exclusive — the script handles the +1 day).
   Timed events are supported via `--start` / `--end` (Europe/Berlin, they mark
   you busy / OPAQUE); use them for actual program or talk times.
+- **Target calendar: `CM_Absence`** (owned by `cm-office`, shared to Erik with
+  write access). Set via `identity.yaml` `kalender:` `calendar_name: CM_Absence`
+  + `shared_owner: cm-office`. The script searches Erik's own calendars first,
+  then the owner's home. To confirm it's visible/writable or to grab its exact
+  URL, run `python scripts/add_to_calendar.py --list-calendars`; if name-matching
+  fails, paste the URL into `calendar_url:`. `--delete --confirm` removes an event.
 - Credentials come from `identity.yaml` `kalender:` (local, never in the repo).
   If the `app_password` is still the placeholder, the push fails with a clear
   message — tell Erik to generate a Kerio app password and paste it in.
