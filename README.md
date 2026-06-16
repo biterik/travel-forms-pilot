@@ -10,6 +10,8 @@ The default institute is MPI for Sustainable Materials (formerly MPI Eisenforsch
 
 ## What it does, concretely
 
+On request, it can also drop the trip into your calendar (via CalDAV, set up for Kerio Connect).
+
 For each business trip, the pilot manages four artifacts:
 
 1. A per-trip `trip.md` (YAML header + free-text sections) that travels with the trip from invitation to reimbursement.
@@ -323,4 +325,4 @@ Pull requests welcome — especially:
 
 ## Acknowledgements
 
-Built on top of the German *Dienstreise* paperwork conventions used at MPI-SusMat / MPI Eisenforschung Düsseldorf. The MPIE form templates remain the property of MPI and are included here only as the working substrate the skill drives — they may not be redistributed under the MIT licence; replace them with your own institute's forms when forking outside MPIE.
+Built on top of the German *Dienstreise* paperwork conventions used at MPI-SusMat / MPI Eisenforschung Düsseldorf. The MPIE form templates remain the property of MPI and are included here only as the working substrate the skill drives — they may not be redistributed under the MIT licence; replace them with your own institute's forms when forking outside MPI-SusMat.
