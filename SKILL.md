@@ -23,7 +23,7 @@ When the user mentions a trip folder (existing or just-created), the agent:
 2. **Runs `scripts/bootstrap_trip.py <trip-folder>`** immediately. This creates `1_Invitation/`, `2_Application/`, `3_Booking/`, `receipts/`, `5_Expense_Report/`, `6_Followup/` if they're missing, copies `templates/trip.md.tmpl` to `<trip-folder>/trip.md` if it's missing, and pre-fills the YAML header with the date / location / event guessed from the folder name. Idempotent — safe to re-run.
 2. **Lists the loose files** at the top level (the script prints these). For each, inspect the filename (and if needed open it with `Read`) and **propose moves** into the right subfolder. See `prompts/00_pilot.md` for the file → subfolder rules of thumb. Present moves as one short table; user confirms with "ok" or corrects in one reply; agent runs the `mv` commands.
 3. **Pre-fill `trip.md` further** by reading the invitation / programme files: extract `event_url`, `datum_ende`, refine `ziel` and `event`, capture `reisezweck_kurz` (one-line). Update the YAML header. Show what was filled.
-4. **One batched `AskUserQuestion`** for whatever is still open — typically: document language (EN/DE), transport (Bahn/Flug/PKW), cost bearer (institute / partly external / fully external), justification if needed, A1 confirmation if EU. 3–4 questions, "Recommended" first.
+4. **One batched `AskUserQuestion`** for whatever is still open — typically: document language (EN/DE), transport (Bahn/Flug/PKW), cost bearer (institute / partly external / fully external), the **registration / early-bird deadline** (record in the `anmeldung:` block — easy to forget, and the dashboard alerts on it), justification if needed, A1 confirmation if EU. "Recommended" first.
 5. **Generate the application** via `scripts/fill_application.py`. Hand back the PDF path. **Do not render the PDF as an image and re-inspect it.** The user opens it in Preview.
 6. **Offer calendar entry — MANDATORY, never skip.** Immediately after presenting the PDF path, ask with one `AskUserQuestion` ("Add to calendar? Yes / No") — even if the user never mentioned the calendar, even after a correction/regeneration. Do not proceed to "next steps" text until this question has been asked. If yes:
    - Run `scripts/add_to_calendar.py <trip-folder> [--start HH:MM --end HH:MM]` (dry-run, no password needed) and show the proposed event summary.
@@ -85,9 +85,11 @@ Recommended default: **German** (the MPIE Reisestelle prefers German forms). The
 
 When building or modifying Word forms, do NOT hand-edit XML. Use the scripts in `scripts/`:
 
-- `scripts/bootstrap_trip.py <trip-folder>` — scaffold subfolders + `trip.md` from the folder name. Run this first whenever the user names a trip folder.
+- `scripts/bootstrap_trip.py <trip-folder>` — scaffold subfolders + `trip.md` from the folder name. Run this first whenever the user names a *new* trip folder.
 - `scripts/fill_application.py --config <yaml> --output-dir <dir>` — build Dienstreiseantrag + A1.
 - `scripts/fill_expense.py --config <yaml> --output-dir <dir>` — build Reiseabrechnung.
+- `scripts/dashboard.py <trips-root> [--text] [--open]` — portable read-only overview of all trips → self-contained HTML (+ text). Action-first alerts (deadlines, application gaps, registration/early-bird, pending reimbursement). See `prompts/50_dashboard.md`.
+- `scripts/backlog_trip.py <trip-folder>` — import an OLD, already-completed single-trip folder: set status (`closed`/`open-unsure`) + `milestones:`, recover destination/dates/purpose/trip-number, fill `trip.md`, and sort loose files. **Previews by default** (prints gleaned facts + a "missing" list, changes nothing); pass `--confirm` to apply. Always show the user the facts + gaps before confirming. Lenient, non-destructive. See `prompts/40_backlog.md`.
 
 The fill scripts take a flat YAML of field indices + checkbox indices and produce DOCX + PDF in one call. The field index table for the Antrag is in `docs/formular_mechanik.md`.
 

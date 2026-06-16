@@ -24,7 +24,7 @@ The config YAML has this shape:
       1: Erik
       2: CM
       3: W0405001
-      4: "6568"
+      4: "1234"
       6: "MecaNano Summer School, COST CA21121"
       7: "Cargèse, Frankreich"
       8: "01.09.2026"
@@ -34,7 +34,7 @@ The config YAML has this shape:
       22: "Düsseldorf, 26.05.2026"
       26: Bitzek
       27: Erik
-      28: "6568"
+      28: "1234"
       29: "01.09.2026"
       30: "06.09.2026"
       31: "Institut d'Études Scientifiques de Cargèse"

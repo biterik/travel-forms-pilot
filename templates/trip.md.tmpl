@@ -1,7 +1,20 @@
 ---
-# Trip status — moves through in order:
-# planned → submitted → approved → completed → filed → reimbursed
-status: planned
+# Headline status (one of):
+#   open         — active trip; state is known and something is still outstanding
+#   open-unsure  — open AND imported from old files, so the milestones below are not verified
+#   closed       — settlement (DR-Abrechnung) proof on file; reimbursed, nothing left to do
+status: open
+
+# Milestones — what has actually happened. true / false / blank (= unknown or n.a.)
+milestones:
+  antrag_gestellt:               # DR-Antrag submitted to the Reisestelle
+  antrag_genehmigt:              # approved (trip number assigned)
+  reise_gebucht:                 # travel booked (train / flight)
+  hotel_gebucht:                 # hotel booked
+  vorschuss:                     # advance payment granted (if yes, the Abrechnung is due immediately)
+  event_stattgefunden:           # the event / trip has taken place
+  abrechnung_eingereicht:        # DR-Abrechnung (expense report) submitted
+  erstattet:                     # reimbursed / paid (settlement proof on file -> status: closed)
 
 # Key data
 ziel: ""                    # location, e.g. "Cargèse, France" or "Erlangen, Germany"
@@ -10,6 +23,12 @@ event_url: ""               # original URL of the conference / invitation page
 datum_start: YYYY-MM-DD     # trip start
 datum_ende: YYYY-MM-DD      # trip end
 abrechnungsfrist: YYYY-MM-DD  # trip end + 3 months (with advance: immediately)
+
+# Registration / conference sign-up (ask for these when planning a new trip!)
+anmeldung:
+  early_bird_frist:           # early-bird registration deadline (YYYY-MM-DD) — often the real deadline
+  frist:                      # regular registration deadline (YYYY-MM-DD)
+  angemeldet:                 # registered? true / false / blank (= n.a.)
 
 # Administrative data
 reisenummer: ""             # assigned by the Reisestelle, e.g. "DR6129"

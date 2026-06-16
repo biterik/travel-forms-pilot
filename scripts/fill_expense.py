@@ -23,7 +23,7 @@ Config shape:
     # Header fields by alias (resolved against NAMED_FIELDS below).
     named:
       name: Bitzek
-      personalnummer: "6568"
+      personalnummer: "1234"
       reiseziel: "Erlangen, Deutschland"
       pauschal_erstattung_eur: ""
       reisezweck: "FAU Erlangen, AMMP-Vorlesung"

@@ -20,18 +20,37 @@ When the user names a trip folder (existing or just-created):
    | `taxi_receipt.heic` | → | `receipts/` | iPhone photo of a taxi receipt |
 
    User confirms with "ok" or corrects in one reply. Then run the `mv` commands.
-3. **Read invitation/programme files to enrich `trip.md`**: extract `event_url`, `datum_ende`, country, `reisezweck_kurz` (one-line). Update the YAML header in place.
+3. **Read invitation/programme files to enrich `trip.md`**: extract `event_url`, `datum_ende`, country, `reisezweck_kurz` (one-line), and any **registration / early-bird deadline** mentioned. Update the YAML header in place (incl. the `anmeldung:` block).
 4. **One batched `AskUserQuestion`** for what's still open — typically:
    - Document language (DE / EN), default DE
    - Transport (Bahn / Flug / PKW / Mietwagen)
    - Cost bearer (institute / partly external / fully external)
    - A1 needed (auto-Yes if EU, but confirm)
+   - **Registration / early-bird deadline** — when must you register, and is there an early-bird rate with an earlier (often the real) deadline? Record in `trip.md` `anmeldung:` (`early_bird_frist`, `frist`, `angemeldet`). If unknown, say so and check the event page.
    - Any non-standard justification text needed
 5. **Show the proposed YAML config in chat** (field index → value, checkbox indices, trim mode, output_basename). User confirms or corrects.
 6. **Run `scripts/fill_application.py`**. Report DOCX + PDF paths.
 7. **Stop.** Do not re-render the PDF and look at it. User opens it in Preview.
 
 For an expense report: same shape with `scripts/fill_expense.py`, starting from the `receipts/` folder content.
+
+### Updating an existing trip (new documents arrive)
+
+When the user re-opens a trip folder after dropping in new files (a booking, a registration confirmation, the approval email with the trip number, receipts):
+
+1. Re-run `scripts/bootstrap_trip.py` (idempotent) and sort the new loose files into subfolders.
+2. **Update the `trip.md` milestones and fields** from what arrived:
+   - approval / trip number assigned → set `reisenummer` and `milestones: antrag_genehmigt: true` (and `antrag_gestellt: true`).
+   - travel / hotel booking confirmation → `reise_gebucht` / `hotel_gebucht: true`.
+   - registration / fee-payment confirmation → `anmeldung: angemeldet: true`.
+   - advance granted → `vorschuss: true`.
+3. Regenerate the dashboard (see "What the pilot ALWAYS does").
+
+Booking happens **only after the application is approved** — if the user is about to book before approval, point it out.
+
+### Closing a trip
+
+When the administration's settlement letter arrives, follow `prompts/70_closing.md`: compare what was **paid** against what was **claimed**, explain any differences, and — once the user accepts — set `milestones: erstattet: true` and `status: closed`.
 
 ### Calendar entry — MANDATORY after every application, no exceptions
 
@@ -87,7 +106,9 @@ The pilot is a **competent, forward-looking colleague**, not a textbook. It know
 - State the file location of every generated document clearly, with the path relative to the trip folder.
 - **After every expense report, actively ask about bonus points** (BahnBonus per leg, Miles & More per flight). Record in the trip's `trip.md` and in `bonus_points.md` as the running balance. Only set `gemeldet_an_reisestelle: true` once the batch report has been sent to `travel@mpi-susmat.de`.
 - Maintain a `trip.md` for each trip — bootstrap_trip.py creates it; the agent enriches it during briefing.
+- **For every new trip, ask for the early-bird / registration deadline** and record it in the `anmeldung:` block. It's easy to forget and the dashboard alerts on it. If there's an early-bird rate, capture that earlier date too.
 - **For calendar entries, always preview and ask before pushing.** Only run `add_to_calendar.py --confirm` after the user has said yes to the proposed event.
+- **Regenerate the dashboard after any change to a `trip.md`** (new trip, update, expense report, closing). Run `scripts/dashboard.py <trips-root>` so `dashboard.html` always reflects the latest state. The user can also run it themselves — it's a plain, LLM-independent script.
 
 ## Date formatting and sanity-checking
 

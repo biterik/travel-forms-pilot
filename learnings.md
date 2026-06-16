@@ -82,6 +82,24 @@ This file grows with every trip that gets worked through. Entries are short and 
 - The fix (updating KADE on the AD server) requires MPIE IT. Until then, runtime prompt is the correct flow.
 - **Calendar target is the shared `CM_Absence` calendar** (owned by `cm-office`, shared to Erik with write access) — not Erik's personal calendar. Configured in `identity.yaml` `kalender:` via `calendar_name: CM_Absence` + `shared_owner: cm-office`. `add_to_calendar.py` searches Erik's own calendars first, then the owner's home. Use `--list-calendars` to confirm visibility / grab the exact URL (paste into `calendar_url:` if name-matching fails), and `--delete --confirm` to remove an event.
 
+## Backlog import (old trips)
+
+- **Use `scripts/backlog_trip.py <folder>`** for old, completed single-trip folders — never hand-build their `trip.md`. It **previews by default** (gleaned facts, each tagged with its source `[application]`/`[folder name]`/`[default]`, plus a "Missing / needs checking" list) and only writes/sorts on `--confirm`. Always show Erik the facts + gaps for each folder before confirming. Lenient and non-destructive.
+- **Status model (revised 16 June 2026):** headline `status` is `open` / `open-unsure` / `closed`, plus a `milestones:` block (`antrag_gestellt`, `antrag_genehmigt`, `reise_gebucht`, `hotel_gebucht`, `vorschuss`, `event_stattgefunden`, `abrechnung_eingereicht`, `erstattet`). `closed` requires settlement (DR-Abrechnung) proof on file; backlog imports default to `open-unsure`. The importer sets milestones conservatively (only `true` on positive evidence from filenames/PDF, blank otherwise). The old linear enum (`planned → … → reimbursed`) is retired; all existing `trip.md`s were migrated.
+- **A `_Vorlage`/template expense file is NOT proof of filing.** Don't mark `abrechnung_eingereicht`/`filed` just because a `*Reiseabrechnung*` file exists — if it's the template, leave the milestone blank.
+- **Filename gotchas learned here:** the trip number `DR####` is usually preceded by `_`, so a regex `\bDR` fails — use a letter lookbehind `(?<![A-Za-z])DR\d{3,}`. Signed application copies are sometimes flattened scans with no text layer, so extraction must try *all* PDFs until one yields text, not just the signed one.
+- **Old folders are sometimes named `EVENT_LOCATION`** (e.g. `20230905_Complas_Barcelona`, Complas = event, Barcelona = city) instead of the `LOCATION_EVENT` convention — so `ziel`/`event` from the folder name can be swapped. Destination from the application PDF is more reliable; always eyeball the dry-run.
+- **Scope so far:** single-trip folders only. Year-aggregator folders (`2025_FAU`, `2024_DFG`, …) holding many trips, and the loose `Bitzek_DR####_*.pdf` settlement PDFs at the `TRAVEL-FORMS` top level, are not handled yet.
+
+## Dashboard & registration
+
+- **Dashboard = `scripts/dashboard.py <trips-root>`** — portable (stdlib + PyYAML, no LLM, cross-OS), read-only, writes a self-contained HTML (+ `--text`). Spot something → edit the trip's `trip.md` → re-run. Only trips with a `trip.md` appear, so import old folders first (`backlog_trip.py`).
+- **Always capture the registration / early-bird deadline for new trips** in the `anmeldung:` block (`early_bird_frist`, `frist`, `angemeldet`). This was historically forgotten; the dashboard now alerts on it. The early-bird date is often the one that actually matters.
+- **Keep the dashboard portable:** no network/CDN/JS libraries, no OS-specific calls — pure stdlib + PyYAML, single self-contained HTML.
+- **Regenerate `dashboard.html` after every `trip.md` change** (new trip, update, expense report, closing) so it's always current. The user can also run `dashboard.py` themselves.
+- **Closing = check the settlement letter** (`prompts/70_closing.md`): read the admin's settlement letter AND the submitted Reiseabrechnung, compare paid vs. claimed, explain differences in plain language, never invent figures (ask if it's a scan). On acceptance set `erstattet: true` + `status: closed`. This is an LLM reading task (portable), not a deterministic parser.
+- **Update flow (B):** when new docs arrive for an active trip, re-run bootstrap (sorts files) and update `trip.md` milestones — approval/trip number → `antrag_genehmigt`+`reisenummer`; booking → `reise_gebucht`/`hotel_gebucht`; sign-up → `angemeldet`. Booking only after approval.
+
 ## Open questions / next improvements
 
 - Centralize `identity.yaml` — currently lives in `TRAVEL-WORKFLOW-DEVEL/`, should later move to `~/.travel-forms-pilot/identity.yaml` per the concept.
