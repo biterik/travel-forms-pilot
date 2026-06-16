@@ -34,9 +34,11 @@ pip install pyyaml --break-system-packages       # macOS / system Python
 
 Install LibreOffice if you don't have it (macOS: `brew install --cask libreoffice`). The scripts auto-detect it.
 
-Then, in your LLM of choice (see [Using with Claude](#using-with-claude) or [Using with other LLMs](#using-with-other-llms) below), point it at the repo. The typical first message is just:
+Then, in your LLM of choice (see [Using with Claude](#using-with-claude) or [Using with other LLMs](#using-with-other-llms) below), point it at the repo. **For Claude Cowork / Code:** place `CLAUDE.md` at your workspace root (see below) — Claude then loads the skill automatically and you just say what you need:
 
-> *"Read `SKILL.md`. New trip: `~/Desktop/Trips/20260901_Cargese_MecaNano-school/` — I dropped the invitation and the flight booking in there."*
+> *"New trip: `20260901_Cargese_MecaNano-school/` — I dropped the invitation and the flight booking in there."*
+
+**For other LLMs** (or without `CLAUDE.md`), paste `SKILL.md` and `prompts/00_pilot.md` into the system prompt first, then say the same thing.
 
 The LLM bootstraps the folder, sorts your dropped files, pre-fills `trip.md` from the invitation, asks 3–4 batched questions for what's still open, calls `scripts/fill_application.py`, and hands you the signed-ready PDF.
 
@@ -187,28 +189,45 @@ Three setups, all work:
 
 ### Claude Cowork (desktop app)
 
-1. Open the Cowork app and select the folder containing both `travel-forms-pilot/` and your trip folders.
-2. Cowork auto-discovers the skill (it reads `SKILL.md` from any subfolder).
-3. Start a new conversation. **Settings → Model: Claude Haiku 4.5** is enough for routine work — it's faster and cheaper than Sonnet. Reach for Sonnet only on unusual cases (novel reimbursement rules, complex multi-stop trips, backlog cleanup).
-4. Create a trip folder like `~/Desktop/Trips/20260901_Cargese_MecaNano-school/`, drop your invitation and any bookings into it.
-5. Say: *"Read `SKILL.md`. New trip: `~/Desktop/Trips/20260901_Cargese_MecaNano-school/` — I dropped the invitation and the flight booking in there."*
+**How Claude knows to use this skill: `CLAUDE.md`**
 
-The agent bootstraps the folder, sorts your loose files, pre-fills `trip.md` from the invitation, asks the remaining 3–4 questions, and produces the signed-ready PDF.
+Cowork is built on Claude Code, which automatically reads a file named `CLAUDE.md` at the root of any connected workspace folder when a session starts. This repo ships a `CLAUDE.md` one level *above* `travel-forms-pilot/` (i.e. in the parent folder you connect to Cowork). That file instructs Claude to read `STATUS.md` → `SKILL.md` → `prompts/00_pilot.md` → `learnings.md` → `identity.yaml` before answering anything.
 
-The skill answers in English, accepts your input in English or German, and asks at the start whether to fill the forms in German (default — your *Reisestelle* prefers it) or English.
+**Without `CLAUDE.md` Claude starts blind** — it ignores the skill, the scripts, and the learnings file, and will try to do everything by hand. Always verify the file is in place.
+
+**One-time setup:**
+
+1. Connect the workspace folder that contains both `travel-forms-pilot/` and your trip folders in Cowork (e.g. `~/Desktop/MPIE/TRAVEL-FORMS/TRAVEL-WORKFLOW-DEVEL`).
+2. Confirm `CLAUDE.md` exists at that folder root:
+   ```bash
+   ls ~/Desktop/MPIE/TRAVEL-FORMS/TRAVEL-WORKFLOW-DEVEL/CLAUDE.md
+   ```
+   If it's missing, copy it from the repo:
+   ```bash
+   cp travel-forms-pilot/CLAUDE.md.example ../CLAUDE.md   # if a sample is shipped
+   # or create it manually — contents are in the repo wiki
+   ```
+3. Fill in `identity.yaml` (same folder, not inside `travel-forms-pilot/`, gitignored).
+4. **Settings → Model: Claude Haiku 4.5** for routine work. Use Sonnet only for unusual cases (novel reimbursement rules, complex multi-stop trips, backlog cleanup).
+
+**Per trip — you just say what you need:**
+
+Once `CLAUDE.md` is in place, open a new Cowork session and say something like:
+
+> *"New trip: `202609_ISAM5_Tokyo/` — I dropped the invitation in there."*
+
+No preamble needed. Claude reads `CLAUDE.md` at startup, loads the full skill context, and picks up from `STATUS.md`.
+
+The skill answers in English, accepts your input in English or German, and asks at the start of each session whether to fill the forms in German (default — your *Reisestelle* prefers it) or English.
 
 ### Claude Code (CLI / IDE integration)
 
 ```bash
-cd ~/your-travel-workspace
-claude     # starts the CLI in the current folder
+cd ~/Desktop/MPIE/TRAVEL-FORMS/TRAVEL-WORKFLOW-DEVEL
+claude     # Claude Code auto-reads CLAUDE.md in the current folder
 ```
 
-Create a trip folder under your workspace, drop your loose files into it, then in Claude Code:
-
-> *"Read `travel-forms-pilot/SKILL.md`. New trip: `./20260901_Cargese_MecaNano-school/` — see what's in there."*
-
-Claude Code has the same file + bash tooling as Cowork; the AskUserQuestion UI is replaced by plain numbered questions but the auto-onboarding (bootstrap_trip.py, file sorting, trip.md enrichment) works identically. Pick Haiku as the default model.
+Same `CLAUDE.md` mechanism as Cowork — Claude Code auto-reads it on startup. No explicit "read SKILL.md" instruction needed. The AskUserQuestion UI is replaced by plain numbered questions, but bootstrap, file sorting, and form generation work identically. Pick Haiku as the default model.
 
 ### claude.ai (web, no file access)
 
