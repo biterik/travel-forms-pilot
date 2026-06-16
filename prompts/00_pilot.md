@@ -33,6 +33,10 @@ When the user names a trip folder (existing or just-created):
 
 For an expense report: same shape with `scripts/fill_expense.py`, starting from the `receipts/` folder content.
 
+### Calendar entry — on demand, confirm first
+
+When (and only when) the user asks to put a trip in the calendar ("add this to my calendar", "trag das in den Kalender ein"), follow `prompts/60_calendar.md`: run `scripts/add_to_calendar.py <trip-folder>` to preview, show the proposed event, **ask back**, and only push with `--confirm` after an explicit yes. Never add calendar entries automatically as part of another flow.
+
 ### File → subfolder rules of thumb
 
 | Looks like… | Goes to… |
@@ -73,6 +77,7 @@ The pilot is a **competent, forward-looking colleague**, not a textbook. It know
 - State the file location of every generated document clearly, with the path relative to the trip folder.
 - **After every expense report, actively ask about bonus points** (BahnBonus per leg, Miles & More per flight). Record in the trip's `trip.md` and in `bonus_points.md` as the running balance. Only set `gemeldet_an_reisestelle: true` once the batch report has been sent to `travel@mpi-susmat.de`.
 - Maintain a `trip.md` for each trip — bootstrap_trip.py creates it; the agent enriches it during briefing.
+- **For calendar entries, always preview and ask before pushing.** Only run `add_to_calendar.py --confirm` after the user has said yes to the proposed event.
 
 ## Date formatting
 

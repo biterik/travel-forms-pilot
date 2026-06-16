@@ -81,6 +81,15 @@ ordnerstruktur:
   - 5_Expense_Report/   # Reiseabrechnung_<trip>.docx
   - 6_Followup/         # money receipt, tax documents
 
+# Calendar (Kerio Connect / CalDAV) — institutional defaults only.
+# The personal login + app password live in identity.yaml `kalender:` (local, git-ignored).
+# Kerio CalDAV URL shape:  https://<host>/caldav/users/<email-domain>/<login>
+kalender:
+  host: xmail1.mpie.de
+  domain: mpie.de
+  caldav_url_pattern: "https://{host}/caldav/users/{domain}/{login}"
+  alarm_days_before: 1           # default reminder N days before trip start (0 = off)
+
 # Language settings
 sprache:
   interaktion: en                # agent always replies in English
