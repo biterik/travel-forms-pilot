@@ -47,8 +47,18 @@ to `trip.md` / `trip.md.tmpl` and fill it, and (b) extend `dashboard.py`.
 - **Application gap** — `antrag_genehmigt` not set and the trip is within ~3
   weeks or already in the past (with no `antrag_gestellt`).
 - **Awaiting reimbursement** — `abrechnung_eingereicht` true but `erstattet` not.
+- **Abstract deadline** — `anmeldung.abstract_frist` within 45 days or passed,
+  `abstract_eingereicht` not true, and the event hasn't happened yet.
 - **Registration** — `anmeldung.early_bird_frist` (preferred) or `frist` within
   45 days or passed, and `angemeldet` not true.
+
+Abstract and registration are **two separate columns** — they are both deadlines
+but of clearly different kinds. The **Abstract** column shows the submission
+deadline (with a ✓ once submitted); the **Registration** column shows the
+early-bird (`EB`) or regular registration date (with a ✓ once registered). The
+**type of contribution** (`beitrag.typ` — invited / plenary / keynote / talk /
+poster) is shown as a badge next to the event name; invited/plenary/keynote are
+highlighted.
 
 Trips are sorted **action-first**: highest-severity alerts at the top (soonest
 deadline first), then upcoming trips, then `closed` ones last.

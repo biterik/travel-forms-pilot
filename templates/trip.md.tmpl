@@ -24,8 +24,16 @@ datum_start: YYYY-MM-DD     # trip start
 datum_ende: YYYY-MM-DD      # trip end
 abrechnungsfrist: YYYY-MM-DD  # trip end + 3 months (with advance: immediately)
 
+# Contribution — the talk / poster being given at this event (ask if unclear!)
+beitrag:
+  typ:                        # eingeladen (invited) | plenar (plenary) | keynote |
+                              #   vortrag (contributed talk) | poster | kein (none) | blank (= unknown)
+  titel:                      # title of the talk / poster
+
 # Registration / conference sign-up (ask for these when planning a new trip!)
 anmeldung:
+  abstract_frist:             # abstract / contribution submission deadline (YYYY-MM-DD) — easy to forget!
+  abstract_eingereicht:       # abstract submitted? true / false / blank (= n.a.)
   early_bird_frist:           # early-bird registration deadline (YYYY-MM-DD) — often the real deadline
   frist:                      # regular registration deadline (YYYY-MM-DD)
   angemeldet:                 # registered? true / false / blank (= n.a.)

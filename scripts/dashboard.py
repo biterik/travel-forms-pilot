@@ -46,8 +46,36 @@ except ImportError:
 ABRECHNUNG_WARN_DAYS = 30      # warn when the 3-month expense deadline is this close
 ANTRAG_WARN_DAYS = 21          # warn when a trip without a submitted application is this close
 REGISTRATION_WARN_DAYS = 45    # warn when a registration deadline is this close
+ABSTRACT_WARN_DAYS = 45        # warn when an abstract-submission deadline is this close
 
 SEV = {"overdue": 3, "warn": 2, "info": 1, "ok": 0}
+
+# Contribution / talk type — maps the (German or English) `beitrag.typ` value to a
+# short display label and a CSS class. "highlight" types (invited/plenary/keynote)
+# get a distinct badge colour; the rest are muted.
+TALK_TYPES = {
+    "eingeladen": ("Invited", "highlight"),
+    "invited": ("Invited", "highlight"),
+    "plenar": ("Plenary", "highlight"),
+    "plenary": ("Plenary", "highlight"),
+    "keynote": ("Keynote", "highlight"),
+    "vortrag": ("Talk", "talk"),
+    "contributed": ("Talk", "talk"),
+    "talk": ("Talk", "talk"),
+    "poster": ("Poster", "talk"),
+    "kein": ("", ""),
+    "none": ("", ""),
+}
+
+
+def talk_label(typ):
+    """(label, css_class) for a beitrag.typ value; ('', '') if none/unknown."""
+    key = str(typ or "").strip().lower()
+    if not key:
+        return "", ""
+    return TALK_TYPES.get(key, (typ.strip().capitalize(), "talk"))
+
+
 MILESTONE_LABELS = [
     ("antrag_gestellt", "Antrag"),
     ("antrag_genehmigt", "Genehmigt"),
@@ -110,14 +138,19 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
     h = parse_header(path)
     m = h.get("milestones") or {}
     an = h.get("anmeldung") or {}
+    be = h.get("beitrag") or {}
 
     status = str(h.get("status") or "open").strip().lower()
     start = to_date(h.get("datum_start"))
     end = to_date(h.get("datum_ende")) or start
     af = to_date(h.get("abrechnungsfrist"))
+    abstract = to_date(an.get("abstract_frist"))
+    abstract_in = is_true(an.get("abstract_eingereicht"))
     eb = to_date(an.get("early_bird_frist"))
     reg = to_date(an.get("frist"))
     angemeldet = is_true(an.get("angemeldet"))
+    talk_lbl, talk_cls = talk_label(be.get("typ"))
+    talk_title = str(be.get("titel") or "").strip()
 
     def ms(k):
         return is_true(m.get(k))
@@ -148,6 +181,14 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
         if ms("abrechnung_eingereicht") and not ms("erstattet"):
             alerts.append(("info", "wartet auf Erstattung"))
 
+        # Abstract / contribution submission deadline
+        if abstract and not abstract_in and not ms("event_stattgefunden"):
+            d = (abstract - today).days
+            if d < 0:
+                alerts.append(("warn", f"Abstract-Frist verpasst ({-d} d)"))
+            elif d <= ABSTRACT_WARN_DAYS:
+                alerts.append(("warn", f"Abstract-Frist in {d} d"))
+
         # Registration (early-bird preferred, else regular)
         if not angemeldet:
             fr, label = (eb, "Early-bird") if eb else (reg, "Anmeldung")
@@ -169,9 +210,14 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
         "start": start,
         "end": end,
         "af": af,
+        "abstract": abstract,
+        "abstract_in": abstract_in,
         "early_bird": eb,
         "reg": reg,
         "angemeldet": angemeldet,
+        "talk_label": talk_lbl,
+        "talk_class": talk_cls,
+        "talk_title": talk_title,
         "reisenummer": str(h.get("reisenummer") or "").strip(),
         "zweck": str(h.get("reisezweck_kurz") or "").strip(),
         "milestones": {k: m.get(k) for k, _ in MILESTONE_LABELS},
@@ -208,7 +254,8 @@ def fmt_range(t) -> str:
 def render_text(trips, today) -> str:
     out = [f"Travel Forms — dashboard ({today.isoformat()}), {len(trips)} trips", "=" * 78]
     for t in sort_trips(trips):
-        line = f"[{t['status']:<11}] {fmt_range(t):<26} {t['event']}"
+        talk = f"  [{t['talk_label']}]" if t["talk_label"] else ""
+        line = f"[{t['status']:<11}] {fmt_range(t):<26} {t['event']}{talk}"
         out.append(line)
         meta = []
         if t["ziel"]:
@@ -217,6 +264,9 @@ def render_text(trips, today) -> str:
             meta.append(t["reisenummer"])
         if t["af"]:
             meta.append(f"Frist {t['af'].isoformat()}")
+        if t["abstract"]:
+            meta.append(f"Abstract {t['abstract'].isoformat()}"
+                        + (" ✓" if t["abstract_in"] else ""))
         if t["early_bird"]:
             meta.append(f"Early-bird {t['early_bird'].isoformat()}")
         if meta:
@@ -250,6 +300,10 @@ tr.closed{opacity:.6}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
 .badge.open{background:var(--open)}.badge.open-unsure{background:var(--unsure)}.badge.closed{background:var(--closed)}
 .event{font-weight:600}
+.talk{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;background:#eef1f5;color:var(--muted)}
+.talk.highlight{background:#efe3fb;color:#7c3aed}
+.dl{font-size:12px;white-space:nowrap}
+.dl .lbl{color:var(--muted)}
 .muted{color:var(--muted);font-size:12px}
 .chip{display:inline-block;padding:2px 7px;border-radius:6px;font-size:12px;margin:1px 3px 1px 0;white-space:nowrap}
 .chip.overdue{background:#fbe6e4;color:var(--overdue);font-weight:600}
@@ -319,7 +373,7 @@ def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
         "</div>"
         "<table><thead><tr>"
         "<th>Trip</th><th>Dates</th><th>Status</th><th>Destination</th>"
-        "<th>Trip&nbsp;#</th><th>Abrechnungsfrist</th><th>Registration</th>"
+        "<th>Trip&nbsp;#</th><th>Abrechnungsfrist</th><th>Abstract</th><th>Registration</th>"
         "<th>Alerts</th><th>Milestones</th></tr></thead><tbody>"
     )
 
@@ -327,14 +381,31 @@ def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
     for t in sort_trips(trips):
         start_k = (t["start"] or dt.date.min).isoformat()
         af_txt = t["af"].isoformat() if t["af"] else "—"
-        if t["early_bird"]:
-            reg_txt = f"EB {t['early_bird'].isoformat()}"
-        elif t["reg"]:
-            reg_txt = t["reg"].isoformat()
+
+        # Abstract column — submission deadline (✓ once submitted).
+        if t["abstract"]:
+            abs_tick = " ✓" if t["abstract_in"] else ""
+            abs_html = f"<span class='dl'>{esc(t['abstract'].isoformat())}{abs_tick}</span>"
+            abs_k = t["abstract"].isoformat()
         else:
-            reg_txt = "—"
-        if t["angemeldet"]:
-            reg_txt += " ✓"
+            abs_html, abs_k = "<span class='muted'>—</span>", ""
+
+        # Registration column — early-bird (preferred) or regular deadline (✓ once registered).
+        if t["early_bird"]:
+            reg_html = f"<span class='dl'><span class='lbl'>EB</span> {esc(t['early_bird'].isoformat())}"
+            reg_k = t["early_bird"].isoformat()
+        elif t["reg"]:
+            reg_html = f"<span class='dl'>{esc(t['reg'].isoformat())}"
+            reg_k = t["reg"].isoformat()
+        else:
+            reg_html, reg_k = "", ""
+        if reg_html:
+            reg_html += (" ✓" if t["angemeldet"] else "") + "</span>"
+        else:
+            reg_html = "<span class='muted'>—</span>"
+
+        talk_badge = (f"<span class='talk {esc(t['talk_class'])}' title='{esc(t['talk_title'])}'>"
+                      f"{esc(t['talk_label'])}</span>") if t["talk_label"] else ""
         alert_html = "".join(
             f"<span class='chip {lvl}'>{esc(txt)}</span>" for lvl, txt in t["alerts"]
         ) or "<span class='muted'>—</span>"
@@ -346,14 +417,15 @@ def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
         zweck = f"<div class='muted'>{esc(t['zweck'])}</div>" if t["zweck"] else ""
         rows.append(
             f"<tr class='{esc(t['status'])}' data-status='{esc(t['status'])}' data-sev='{t['severity']}'>"
-            f"<td data-k='{esc(t['event'].lower())}'><span class='event'>{esc(t['event'])}</span>"
+            f"<td data-k='{esc(t['event'].lower())}'><span class='event'>{esc(t['event'])}</span>{talk_badge}"
             f"<div class='muted'>{esc(t['relpath'])}</div>{zweck}</td>"
             f"<td data-k='{esc(start_k)}'>{esc(fmt_range(t))}</td>"
             f"<td data-k='{esc(t['status'])}'><span class='badge {esc(t['status'])}'>{esc(t['status'])}</span></td>"
             f"<td>{esc(t['ziel'] or '—')}</td>"
             f"<td>{esc(t['reisenummer'] or '—')}</td>"
             f"<td data-k='{esc(t['af'].isoformat() if t['af'] else '')}'>{esc(af_txt)}</td>"
-            f"<td data-k='{esc(t['early_bird'].isoformat() if t['early_bird'] else (t['reg'].isoformat() if t['reg'] else ''))}'>{esc(reg_txt)}</td>"
+            f"<td data-k='{esc(abs_k)}'>{abs_html}</td>"
+            f"<td data-k='{esc(reg_k)}'>{reg_html}</td>"
             f"<td data-k='{t['severity']}'>{alert_html}</td>"
             f"<td><div class='ms'>{ms_html}</div></td></tr>"
         )

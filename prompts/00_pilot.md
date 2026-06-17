@@ -20,12 +20,14 @@ When the user names a trip folder (existing or just-created):
    | `taxi_receipt.heic` | → | `receipts/` | iPhone photo of a taxi receipt |
 
    User confirms with "ok" or corrects in one reply. Then run the `mv` commands.
-3. **Read invitation/programme files to enrich `trip.md`**: extract `event_url`, `datum_ende`, country, `reisezweck_kurz` (one-line), and any **registration / early-bird deadline** mentioned. Update the YAML header in place (incl. the `anmeldung:` block).
+3. **Read invitation/programme files to enrich `trip.md`**: extract `event_url`, `datum_ende`, country, `reisezweck_kurz` (one-line), the **abstract-submission deadline** and any **registration / early-bird deadline** mentioned, and the **type of contribution** (invited / plenary / keynote / contributed talk / poster / none). Update the YAML header in place (incl. the `beitrag:` and `anmeldung:` blocks).
 4. **One batched `AskUserQuestion`** for what's still open — typically:
    - Document language (DE / EN), default DE
    - Transport (Bahn / Flug / PKW / Mietwagen)
    - Cost bearer (institute / partly external / fully external)
    - A1 needed (auto-Yes if EU, but confirm)
+   - **Type of contribution** — invited / plenary / keynote / contributed talk / poster / none. Infer from the invitation where possible (e.g. "we would like to invite you to give a plenary lecture" → plenary), only ask if unclear. Record in `trip.md` `beitrag:` (`typ`, `titel`).
+   - **Abstract-submission deadline** — when must the abstract / contribution be submitted, and has it been? Record in `trip.md` `anmeldung:` (`abstract_frist`, `abstract_eingereicht`). Easy to forget; the dashboard alerts on it.
    - **Registration / early-bird deadline** — when must you register, and is there an early-bird rate with an earlier (often the real) deadline? Record in `trip.md` `anmeldung:` (`early_bird_frist`, `frist`, `angemeldet`). If unknown, say so and check the event page.
    - Any non-standard justification text needed
 5. **Show the proposed YAML config in chat** (field index → value, checkbox indices, trim mode, output_basename). User confirms or corrects.
@@ -43,6 +45,7 @@ When the user re-opens a trip folder after dropping in new files (a booking, a r
    - approval / trip number assigned → set `reisenummer` and `milestones: antrag_genehmigt: true` (and `antrag_gestellt: true`).
    - travel / hotel booking confirmation → `reise_gebucht` / `hotel_gebucht: true`.
    - registration / fee-payment confirmation → `anmeldung: angemeldet: true`.
+   - abstract submitted / acceptance notification → `anmeldung: abstract_eingereicht: true` (and confirm/refine `beitrag: typ` if the acceptance specifies the format, e.g. selected for a talk vs. poster).
    - advance granted → `vorschuss: true`.
 3. Regenerate the dashboard (see "What the pilot ALWAYS does").
 
@@ -107,6 +110,8 @@ The pilot is a **competent, forward-looking colleague**, not a textbook. It know
 - **After every expense report, actively ask about bonus points** (BahnBonus per leg, Miles & More per flight). Record in the trip's `trip.md` and in `bonus_points.md` as the running balance. Only set `gemeldet_an_reisestelle: true` once the batch report has been sent to `travel@mpi-susmat.de`.
 - Maintain a `trip.md` for each trip — bootstrap_trip.py creates it; the agent enriches it during briefing.
 - **For every new trip, ask for the early-bird / registration deadline** and record it in the `anmeldung:` block. It's easy to forget and the dashboard alerts on it. If there's an early-bird rate, capture that earlier date too.
+- **Capture the abstract-submission deadline too** (`anmeldung: abstract_frist` / `abstract_eingereicht`). It's the earliest hard deadline for most conferences and the dashboard alerts on it.
+- **Determine the type of contribution** (invited / plenary / keynote / contributed talk / poster / none) and record it in `beitrag:` (`typ` + talk `titel`). Infer it from the invitation wording when you can; only ask if it's genuinely unclear. It shows on the dashboard.
 - **For calendar entries, always preview and ask before pushing.** Only run `add_to_calendar.py --confirm` after the user has said yes to the proposed event.
 - **Regenerate the dashboard after any change to a `trip.md`** (new trip, update, expense report, closing). Run `scripts/dashboard.py <trips-root>` so `dashboard.html` always reflects the latest state. The user can also run it themselves — it's a plain, LLM-independent script.
 
