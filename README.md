@@ -107,20 +107,77 @@ and a session that starts already knowing what to do.
 
 ### 1. The repo and its dependencies
 
-You need Python 3.9+ and, for PDF output, LibreOffice.
+You need Python 3.9+, and for PDF output either LibreOffice or Microsoft Word.
 
 ```bash
 git clone https://github.com/biterik/travel-forms-pilot.git
 cd travel-forms-pilot
-pip install pyyaml --break-system-packages
 ```
 
-`pyyaml` is the only hard requirement. On macOS / system Python use
-`--break-system-packages` (or `--user`); inside a virtualenv drop the flag.
+`pyyaml` is the only hard requirement — see **Helper tools** immediately below
+for how to install it against the right interpreter, which is the one thing here
+that reliably goes wrong.
 
-LibreOffice is what turns the filled DOCX into a signable PDF — without it you
-get the DOCX and convert it yourself. macOS: `brew install --cask libreoffice`.
-The scripts auto-detect it.
+#### Helper tools
+
+Two of these are optional, but the first one isn't.
+
+**`pyyaml` — required.** Every script reads YAML. Install it for the *same*
+`python3` you'll actually invoke, which on macOS is usually Homebrew's, not
+a conda env that only exists inside an activated shell:
+
+```bash
+which python3                 # e.g. /opt/homebrew/bin/python3
+python3 -m pip install pyyaml --break-system-packages
+```
+
+Drop `--break-system-packages` inside a virtualenv or conda env. If you run the
+pilot under conda, activate that env before every session — otherwise the
+assistant's plain `python3` won't find `pyyaml` and will start improvising.
+
+**LibreOffice — recommended, for PDF export.** This is what turns the filled
+DOCX into the signable PDF:
+
+```bash
+brew install --cask libreoffice
+```
+
+If that fails with `Connection reset by peer` or an SSL error, your network is
+blocking `download.documentfoundation.org` — common on institutional networks.
+Use a mirror instead:
+
+```bash
+cd ~/Downloads
+curl -LO https://ftp.fau.de/tdf/libreoffice/stable/26.2.5/mac/aarch64/LibreOffice_26.2.5_MacOS_aarch64.dmg
+hdiutil attach LibreOffice_26.2.5_MacOS_aarch64.dmg
+cp -R /Volumes/LibreOffice*/LibreOffice.app /Applications/
+hdiutil detach /Volumes/LibreOffice*
+xattr -dr com.apple.quarantine /Applications/LibreOffice.app
+```
+
+Check the current version at `https://ftp.fau.de/tdf/libreoffice/stable/` and
+adjust. The `xattr` line matters: without it the *headless* launch can hang on a
+Gatekeeper prompt nobody ever sees, which looks exactly like a silent conversion
+failure. Note Homebrew won't manage an install done this way — update by
+re-running the curl.
+
+**Microsoft Word — optional fallback.** If LibreOffice isn't installed and
+`/Applications/Microsoft Word.app` is, the PDF is exported through Word via
+AppleScript instead. It works and renders the templates faithfully, but it is
+not headless: Word's window opens, Word stays running, and macOS asks once for
+permission ("Terminal wants to control Microsoft Word" — allow it, or enable it
+under System Settings → Privacy & Security → Automation). That's why LibreOffice
+is tried first.
+
+**Converter order and override.** `soffice` first, then Word. To force one:
+
+```bash
+export TFP_PDF_CONVERTER=soffice   # or: word, auto (default)
+```
+
+With neither installed you still get a correct DOCX and export the PDF yourself
+— nothing else in the pilot is affected. If a trip folder ever has a DOCX but no
+PDF, check the converter before suspecting the form logic.
 
 ### 2. Decide where things live
 
@@ -298,7 +355,7 @@ travel-forms-pilot/
 │   ├── 60_calendar.md        ← calendar mode: absence block + itinerary, via calmcp
 │   └── 70_closing.md         ← closing mode: check the settlement letter, close the trip
 ├── scripts/
-│   ├── _docx_form.py             ← shared DOCX form-fill engine (stdlib + optional soffice)
+│   ├── _docx_form.py             ← shared DOCX form-fill engine (stdlib; PDF via Word or soffice)
 │   ├── bootstrap_trip.py         ← scaffold a fresh trip folder (subfolders + trip.md)
 │   ├── backlog_trip.py           ← import an OLD trip folder (infer status, fill trip.md, sort files)
 │   ├── dashboard.py              ← portable overview of all trips → self-contained HTML (+ text)

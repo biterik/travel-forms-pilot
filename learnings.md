@@ -99,6 +99,15 @@ If a session goes wrong from the start (wrong approach, ignoring the scripts, ha
 - **The old KADE problem no longer bites.** Kerio app passwords don't work for AD-imported accounts (known bug, fix needs MPIE IT) — that was the whole reason for the runtime password prompt. With the MCP server the regular password sits in the Keychain and the question doesn't arise. Still relevant only on the `add_to_calendar.py` fallback path.
 - `add_to_calendar.py` is retained as the fallback for sessions without the MCP server (GWDG, bare chat, another vendor). It covers the absence block only.
 
+## PDF export (revised July 2026)
+
+- **LibreOffice first, Word second** (revised after testing, 28 July 2026). `_docx_form.to_pdf()` tries `soffice` headless, then Microsoft Word via AppleScript. Override with `TFP_PDF_CONVERTER=soffice|word|auto`.
+- **Why not Word first:** it works and renders faithfully, but it is not headless — the window opens, Word stays running, and macOS demands Automation permission. The first implementation also asked System Events whether Word was running (so it could quit it), which cost a *second* permission prompt; that call was removed. LibreOffice is silent and needs no grants, so it goes first.
+- **Installing LibreOffice at MPIE:** the network blocks `download.documentfoundation.org` (TLS handshake reset at connect), so `brew install --cask libreoffice` fails outright. The FAU mirror `ftp.fau.de/tdf/libreoffice/stable/` works — curl the DMG, copy the app to `/Applications`, done. Homebrew then won't manage updates.
+- **After a manual LibreOffice install, clear the quarantine flag** (`xattr -dr com.apple.quarantine /Applications/LibreOffice.app`) — otherwise the headless launch can hang on a Gatekeeper prompt nobody sees, which looks exactly like a silent conversion failure.
+- **A missing converter is silent by design:** the DOCX is still produced. If a trip folder has a DOCX but no PDF, check the converter before suspecting the form logic.
+- `python3` on this Mac is Homebrew's (`/opt/homebrew/bin/python3`), not the conda base env — `pyyaml` must be installed there for the scripts to run from a plain shell.
+
 ## Backlog import (old trips)
 
 - **Use `scripts/backlog_trip.py <folder>`** for old, completed single-trip folders — never hand-build their `trip.md`. It **previews by default** (gleaned facts, each tagged with its source `[application]`/`[folder name]`/`[default]`, plus a "Missing / needs checking" list) and only writes/sorts on `--confirm`. Always show Erik the facts + gaps for each folder before confirming. Lenient and non-destructive.

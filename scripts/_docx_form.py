@@ -1,19 +1,24 @@
 """Self-contained DOCX form-filler for MPIE travel forms.
 
-No external dependencies beyond Python stdlib + optional LibreOffice (soffice) for PDF.
+No external dependencies beyond Python stdlib. PDF export uses Microsoft Word if
+it is installed (macOS), otherwise LibreOffice (soffice) — both optional.
 
-The class works directly on the DOCX zip — it never invokes Word. It edits
+The class works directly on the DOCX zip — form filling never invokes Word or
+LibreOffice; they are used only for the final PDF export. It edits
 `word/document.xml` to:
   * fill FORMTEXT fields (indexed by their order of appearance)
   * toggle ☐ → ☒ checkboxes (indexed in the same order)
   * optionally trim the 7-page Antrag template down to "application + A1"
     or "inland single page"
 
-PDF conversion is delegated to LibreOffice / soffice. If soffice is missing
-the DOCX is still produced and the caller is told to convert manually.
+PDF conversion is tried in order: LibreOffice / soffice headless, then Microsoft
+Word via AppleScript (macOS). Override with TFP_PDF_CONVERTER=soffice|word|auto.
+If neither is available the DOCX is still produced and the caller is told to
+convert manually.
 """
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -38,6 +43,71 @@ def _esc(s: str) -> bytes:
     return (s.replace('&', '&amp;')
              .replace('<', '&lt;')
              .replace('>', '&gt;')).encode('utf-8')
+
+
+WORD_APP = Path('/Applications/Microsoft Word.app')
+
+# AppleScript driving Microsoft Word to export a DOCX as PDF.
+# argv: 1 = input .docx (POSIX path), 2 = output .pdf (POSIX path)
+#
+# Deliberately talks to ONE app only. An earlier version also asked System Events
+# whether Word was already running, so it could quit Word afterwards — that cost a
+# second macOS Automation permission prompt for no real benefit. We now touch only
+# Word (one prompt, once) and leave it running.
+_WORD_EXPORT_SCRIPT = r'''
+on run argv
+    set inPOSIX to item 1 of argv
+    set outPOSIX to item 2 of argv
+    set inFile to POSIX file inPOSIX as text
+    set outFile to POSIX file outPOSIX as text
+
+    tell application "Microsoft Word"
+        set theDoc to open file name inFile with read only
+        try
+            save as theDoc file name outFile file format format PDF
+        on error errMsg number errNum
+            try
+                close theDoc saving no
+            end try
+            error errMsg number errNum
+        end try
+        close theDoc saving no
+    end tell
+    return "ok"
+end run
+'''
+
+
+def _find_word() -> Path | None:
+    """Return the Microsoft Word application bundle, or None if not installed."""
+    return WORD_APP if WORD_APP.is_dir() else None
+
+
+def _word_to_pdf(docx_path: Path, pdf_path: Path, timeout: int = 120) -> bool:
+    """Export DOCX -> PDF using Microsoft Word via AppleScript (macOS only).
+
+    This is the FALLBACK, used when LibreOffice isn't installed. It works and
+    renders the MPIE templates faithfully, but it is not headless: Word's window
+    appears, Word is left running afterwards, and macOS asks once for permission
+    to control Word ("Terminal wants to control Microsoft Word" — allow it, or
+    enable it under Privacy & Security -> Automation).
+
+    Returns True only if a non-empty PDF actually appeared. Any failure returns
+    False so the caller can report that no converter worked.
+    """
+    if _find_word() is None:
+        return False
+    try:
+        r = subprocess.run(
+            ['osascript', '-', str(docx_path), str(pdf_path)],
+            input=_WORD_EXPORT_SCRIPT, text=True,
+            capture_output=True, timeout=timeout, check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
+    if r.returncode != 0:
+        return False
+    return pdf_path.exists() and pdf_path.stat().st_size > 0
 
 
 def _find_soffice() -> str | None:
@@ -322,11 +392,43 @@ class DocxForm:
         return out_path
 
     def to_pdf(self, docx_path: str | Path, pdf_path: str | Path) -> bool:
-        """Convert DOCX to PDF via LibreOffice headless. Returns True on success."""
+        """Convert DOCX to PDF. Returns True on success.
+
+        Converters are tried in order:
+          1. LibreOffice / soffice headless — silent, no GUI, no permissions
+          2. Microsoft Word via AppleScript (macOS) — works, but opens Word and
+             needs a one-off macOS Automation permission
+
+        LibreOffice first because it is genuinely headless: nothing appears on
+        screen and nothing has to be granted. Word is the fallback for machines
+        without LibreOffice.
+
+        Override with TFP_PDF_CONVERTER=soffice|word|auto (default: auto).
+        If neither converter is available the DOCX still exists and the caller
+        reports that the PDF must be exported manually.
+        """
         docx_path = Path(docx_path)
         pdf_path = Path(pdf_path)
         out_dir = pdf_path.parent
         out_dir.mkdir(parents=True, exist_ok=True)
+
+        choice = os.environ.get('TFP_PDF_CONVERTER', 'auto').strip().lower()
+
+        if choice in ('auto', 'soffice', 'libreoffice'):
+            if self._soffice_to_pdf(docx_path, pdf_path, out_dir):
+                return True
+            if choice != 'auto':
+                return False
+
+        if choice in ('auto', 'word'):
+            if _word_to_pdf(docx_path, pdf_path):
+                return True
+
+        return False
+
+    @staticmethod
+    def _soffice_to_pdf(docx_path: Path, pdf_path: Path, out_dir: Path) -> bool:
+        """Convert via LibreOffice headless. Returns True on success."""
         soffice = _find_soffice()
         if soffice is None:
             return False
@@ -342,7 +444,7 @@ class DocxForm:
         if produced.exists():
             if produced != pdf_path:
                 produced.replace(pdf_path)
-            return pdf_path.exists()
+            return pdf_path.exists() and pdf_path.stat().st_size > 0
         return False
 
     # -------------------------------------------------------------- cleanup
