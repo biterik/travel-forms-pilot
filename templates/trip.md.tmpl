@@ -38,9 +38,15 @@ anmeldung:
   frist:                      # regular registration deadline (YYYY-MM-DD)
   angemeldet:                 # registered? true / false / blank (= n.a.)
 
+# Calendar entries pushed for this trip (see prompts/60_calendar.md)
+kalender:
+  absenz_eingetragen:         # all-day absence block on cm_absence? true / false / blank
+  reise_eingetragen:          # itinerary events (legs + hotel) on ic_travel? true / false / blank
+  notiz: ""                   # e.g. "return leg rebooked 3.9. — event moved"
+
 # Administrative data
 reisenummer: ""             # assigned by the Reisestelle, e.g. "DR6129"
-kostenstelle: W0405001
+kostenstelle: ""            # from identity.yaml `kostenstellen: default:` unless this trip differs
 reisezweck_kurz: ""         # one-line description for application and expense report
 
 # Bonus programmes — what this trip earned

@@ -10,7 +10,7 @@ The user points at an old trip folder and asks to "import", "back-fill",
 "read in", or "catch up" old Dienstreisen — e.g. "import 20230425_Madrid_MecaNano",
 "read in my old trips". Scope of this version: **single-trip folders only**
 (one trip per folder). Year-aggregator folders that hold many trips
-(e.g. `2025_FAU`, `2024_DFG`) and the loose `Bitzek_DR####_*.pdf` settlement
+(e.g. `2025_FAU`, `2024_DFG`) and the loose `<Surname>_DR####_*.pdf` settlement
 PDFs at the `TRAVEL-FORMS` top level are **not** handled yet — flag them and skip.
 
 ## Behavior — ALWAYS preview the gleaned facts before writing anything

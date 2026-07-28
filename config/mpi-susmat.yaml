@@ -81,14 +81,27 @@ ordnerstruktur:
   - 5_Expense_Report/   # Reiseabrechnung_<trip>.docx
   - 6_Followup/         # money receipt, tax documents
 
-# Calendar (Kerio Connect / CalDAV) — institutional defaults only.
-# The personal login + app password live in identity.yaml `kalender:` (local, git-ignored).
-# Kerio CalDAV URL shape:  https://<host>/caldav/users/<email-domain>/<login>
+# Calendar — institutional defaults only.
+#
+# Preferred path: the calmcp calendar MCP server
+# (https://github.com/biterik/calendar-mcp-server). Calendar ids, CalDAV URLs and
+# roles live in the user's own calendars.yaml; passwords live in the OS keyring.
+# On that path nothing calendar-related is configured here or in identity.yaml —
+# only the two calendar ids the pilot expects calendars.yaml to define:
 kalender:
-  host: xmail1.mpie.de
-  domain: mpie.de
-  caldav_url_pattern: "https://{host}/caldav/users/{domain}/{login}"
-  alarm_days_before: 1           # default reminder N days before trip start (0 = off)
+  absenz_calendar_id: cm_absence   # shared departmental calendar (role: writable)
+                                   #   -> all-day absence block; needs confirm_foreign
+  reise_calendar_id: ic_travel     # personal calendar (role: owner)
+                                   #   -> travel legs + hotel stays from the bookings
+  timezone: Europe/Berlin
+  alarm_days_before: 1             # default reminder N days before trip start (0 = off)
+
+  # Fallback path only — scripts/add_to_calendar.py, for sessions with no MCP server.
+  # Kerio CalDAV URL shape:  https://<host>/caldav/users/<email-domain>/<login>
+  fallback_caldav:
+    host: xmail1.mpie.de
+    domain: mpie.de
+    caldav_url_pattern: "https://{host}/caldav/users/{domain}/{login}"
 
 # Language settings
 sprache:

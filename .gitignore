@@ -1,6 +1,17 @@
-# Personal data — never in the repo
+# Personal data — never in the repo.
+# The *.example.* counterparts ARE tracked; the real files are not.
 identity.yaml
 bonus_points.md
+personal/
+CLAUDE.md
+
+# Local calendar registry, if anyone keeps a copy here (belongs to calmcp)
+calendars.yaml
+
+# Generated output
+dashboard.html
+push_calendar.command
+out/
 
 # OS junk
 .DS_Store

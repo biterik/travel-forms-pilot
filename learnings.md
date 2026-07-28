@@ -16,7 +16,7 @@ This file grows with every trip that gets worked through. Entries are short and 
 ## Mandatory artifacts per trip
 
 - **`trip.md` is mandatory** in every trip folder. Template: `travel-forms-pilot/templates/trip.md.tmpl`. It is the single source of truth across all phases and contains in its YAML header: `status`, key dates, trip number / cost center, and the `bonusprogramme:` block.
-- **After every expense report, actively ask about bonus points** (BahnBonus and/or Miles & More): number of points/miles per trip, with the rule of thumb "1 point per € Flexpreis Business" for BahnBonus. Record the answer in `trip.md` AND add a row to `TRAVEL-WORKFLOW-DEVEL/bonus_points.md`. Bonus points are reported in batches — set the flag `gemeldet_an_reisestelle:` to `true` only once the batch report has been sent to `travel@mpi-susmat.de`.
+- **After every expense report, actively ask about bonus points** (BahnBonus and/or Miles & More): number of points/miles per trip, with the rule of thumb "1 point per € Flexpreis Business" for BahnBonus. Record the answer in `trip.md` AND add a row to `personal/bonus_points.md` (see the search path above). Bonus points are reported in batches — set the flag `gemeldet_an_reisestelle:` to `true` only once the batch report has been sent to `travel@mpi-susmat.de`.
 
 ## Travel Forms Pilot mode per trip
 
@@ -41,18 +41,32 @@ This file grows with every trip that gets worked through. Entries are short and 
 
 ## Calendar entry — MANDATORY after every application
 
-**After every completed Dienstreiseantrag, always ask about the calendar — no exceptions, even if the user didn't mention it.** This must be the very next thing after presenting the PDF. Use `AskUserQuestion` with "Yes, add it" / "No, skip". If yes: run dry-run, write `push_calendar.command`, tell user to double-click it. Do NOT skip this step even after corrections/regenerations — ask once after the final PDF is delivered.
+**After every completed Dienstreiseantrag, always ask about the calendar — no exceptions, even if the user didn't mention it.** This must be the very next thing after presenting the PDF. Use `AskUserQuestion` with "Yes, add it" / "No, skip". Do NOT skip it even after corrections/regenerations — ask once, after the final PDF is delivered.
 
-## Session startup — CLAUDE.md is mandatory
+If yes: dry-run `create_event` on `cm_absence` via the `calmcp` MCP server, show the returned write contract, then confirm with **both** `confirm=true` and `confirm_foreign=true`. Full behaviour in `prompts/60_calendar.md`.
 
-- **The pilot only works correctly when `CLAUDE.md` exists at the workspace root** (`TRAVEL-WORKFLOW-DEVEL/CLAUDE.md`). Without it, Claude starts blind: ignores SKILL.md, the scripts, and this file, and will try to do everything by hand (editing XML directly, reinventing the workflow, etc.).
-- `CLAUDE.md` tells Claude to read STATUS.md → SKILL.md → 00_pilot.md → learnings.md → identity.yaml before answering. Once in place, no startup preamble is needed — just say what you need.
-- If a session goes wrong from the start (wrong approach, ignoring scripts), the first thing to check is whether CLAUDE.md is present and the correct folder is connected in Cowork.
+## Session startup — how the agent finds the skill (revised July 2026)
+
+There are two mechanisms, and which one applies depends on where the session runs:
+
+- **`CLAUDE.md` at the workspace root** — read automatically by Claude Code (CLI) and by Cowork tasks running *on your computer*. It chains STATUS.md → SKILL.md → 00_pilot.md → learnings.md → identity.yaml. A template ships as `CLAUDE.md.example`; copy it to the root of the folder you connect. The real `CLAUDE.md` lives outside the repo and is git-ignored.
+- **`SKILL.md` installed as a skill** — the mechanism that works everywhere, including **Cowork tasks running in the cloud**, where your folders are reached over the device bridge and `CLAUDE.md` is *not* auto-loaded. This is now the primary path; `CLAUDE.md` is the belt-and-braces backup.
+
+Verified July 2026: in a cloud Cowork session with `TRAVEL-FORMS` connected, `CLAUDE.md` at the folder root was **not** loaded — the file had to be read explicitly. Do not rely on it in that mode.
+
+If a session goes wrong from the start (wrong approach, ignoring the scripts, hand-editing XML), check in this order: is the skill installed; is `CLAUDE.md` present at the *connected* folder root; is the right folder connected at all.
+
+## Personal files live outside the repo (revised July 2026)
+
+- `identity.yaml` and `bonus_points.md` are personal and never committed. Canonical location: **`TRAVEL-FORMS/personal/`** — a sibling of the trip folders, so it survives moving, re-cloning or deleting the repo.
+- The scripts resolve them via `$TFP_IDENTITY` → `$TFP_PERSONAL_DIR` → `<trips-root>/personal/` → one level above the repo (the pre-2026 location, still honoured) → `~/.travel-forms-pilot/`. Never hard-code the path again.
+- The repo ships `identity.example.yaml` and `bonus_points.example.md` with no personal data. Keep it that way: the examples are what an outside user forks.
+- If `identity.yaml` can't be found, **ask** — do not reconstruct a personnel number or cost centre from an old PDF without saying that's what you did.
 
 ## Trip-specific lessons
 
 ### DFG-Jahresversammlung Bonn (June 2026)
-- **Cost bearer: institute (W0405001)** — unlike DFG committee/working-group trips (e.g., DFG Fachforum MatWerk, DFG Darmstadt Jan 2026) which are fully externally funded by DFG, the annual assembly is attended as a DFG member institution representative and charged to the institute. Do not assume "DFG event = externally funded."
+- **Cost bearer: the institute (default cost centre from `identity.yaml`)** — unlike DFG committee/working-group trips (e.g., DFG Fachforum MatWerk, DFG Darmstadt Jan 2026) which are fully externally funded by DFG, the annual assembly is attended as a DFG member institution representative and charged to the institute. Do not assume "DFG event = externally funded."
 - The trip ticket was for **Festliche Veranstaltungen** (evening events only: Communicator-Preis Mo 29.6., Festveranstaltung Di 30.6.) — travel was Di 30.6. only, same-day return (event ends ~23:00, no hotel). Di 30.06.2026 = departure AND return date.
 - Hotel + Tagegeld checked (MPI pays both); no external cost bearer.
 - Bahn; BahnBonus applies.
@@ -72,15 +86,18 @@ This file grows with every trip that gets worked through. Entries are short and 
 
 ## Trip folder location
 
-- **Trip folders live in `TRAVEL-FORMS/`, not inside `TRAVEL-WORKFLOW-DEVEL/`.** The repo is in `TRAVEL-WORKFLOW-DEVEL/travel-forms-pilot/`; trip folders are siblings of `TRAVEL-WORKFLOW-DEVEL/` inside `TRAVEL-FORMS/`.
+- **Trip folders live in `TRAVEL-FORMS/`, never inside the repo.** Layout: `TRAVEL-FORMS/` holds `travel-forms-pilot/` (the repo), `personal/` (identity + bonus points), and the trip folders as siblings of both.
 - Always check whether the named folder already exists before running `bootstrap_trip.py`. If it doesn't exist yet, ask the user where to create it — never assume it belongs in the workspace root.
 
-## Kerio Connect calendar authentication
+## Calendar (revised July 2026 — now via the calmcp MCP server)
 
-- **App passwords do not work for AD-imported accounts** (known KADE bug). Both old and freshly-generated app passwords return 401 for CalDAV PROPFIND, even though credentials are sent correctly.
-- **Workaround:** leave `app_password` blank in `identity.yaml`; `add_to_calendar.py` now prompts via `getpass` at runtime. The user enters their regular MPIE password — never stored anywhere.
-- The fix (updating KADE on the AD server) requires MPIE IT. Until then, runtime prompt is the correct flow.
-- **Calendar target is the shared `CM_Absence` calendar** (owned by `cm-office`, shared to Erik with write access) — not Erik's personal calendar. Configured in `identity.yaml` `kalender:` via `calendar_name: CM_Absence` + `shared_owner: cm-office`. `add_to_calendar.py` searches Erik's own calendars first, then the owner's home. Use `--list-calendars` to confirm visibility / grab the exact URL (paste into `calendar_url:` if name-matching fails), and `--delete --confirm` to remove an event.
+- **Two calendars, two purposes.** `cm_absence` (Kerio, shared, owned by `cm-office`, role `writable`) gets **one all-day block** over the travel period and nothing else — the department reads it. `ic_travel` (iCloud "travel", role `owner`) gets **one event per travel leg and per hotel stay**, built from the booking confirmations. Never put booking detail on the shared calendar.
+- **Two gates, not one.** `calmcp` writes are dry-run until `confirm=true`. A calendar whose role isn't `owner` needs `confirm_foreign=true` **as well** — so every absence-block write needs both. Show the user the returned before/after contract first, and say out loud that `cm_absence` is shared.
+- **Keep the UID scheme.** `travel-forms-pilot-<trip-folder>@mpie.de` for the absence block — unchanged from the `add_to_calendar.py` era, so re-runs update the old events instead of duplicating them. Itinerary UIDs: `tfp-<trip-folder>-out|-ret|-leg<N>|-hotel@travel`.
+- **Rebooking = edit, not a second event.** `move_event` for new times, `update_event` for everything else, same UID.
+- **Credentials are gone from the pilot entirely.** The MCP server pulls them from the OS keyring. No `app_password` in `identity.yaml`, no `getpass`, no `push_calendar.command`. Never ask the user for a calendar password in any mode.
+- **The old KADE problem no longer bites.** Kerio app passwords don't work for AD-imported accounts (known bug, fix needs MPIE IT) — that was the whole reason for the runtime password prompt. With the MCP server the regular password sits in the Keychain and the question doesn't arise. Still relevant only on the `add_to_calendar.py` fallback path.
+- `add_to_calendar.py` is retained as the fallback for sessions without the MCP server (GWDG, bare chat, another vendor). It covers the absence block only.
 
 ## Backlog import (old trips)
 
@@ -89,7 +106,7 @@ This file grows with every trip that gets worked through. Entries are short and 
 - **A `_Vorlage`/template expense file is NOT proof of filing.** Don't mark `abrechnung_eingereicht`/`filed` just because a `*Reiseabrechnung*` file exists — if it's the template, leave the milestone blank.
 - **Filename gotchas learned here:** the trip number `DR####` is usually preceded by `_`, so a regex `\bDR` fails — use a letter lookbehind `(?<![A-Za-z])DR\d{3,}`. Signed application copies are sometimes flattened scans with no text layer, so extraction must try *all* PDFs until one yields text, not just the signed one.
 - **Old folders are sometimes named `EVENT_LOCATION`** (e.g. `20230905_Complas_Barcelona`, Complas = event, Barcelona = city) instead of the `LOCATION_EVENT` convention — so `ziel`/`event` from the folder name can be swapped. Destination from the application PDF is more reliable; always eyeball the dry-run.
-- **Scope so far:** single-trip folders only. Year-aggregator folders (`2025_FAU`, `2024_DFG`, …) holding many trips, and the loose `Bitzek_DR####_*.pdf` settlement PDFs at the `TRAVEL-FORMS` top level, are not handled yet.
+- **Scope so far:** single-trip folders only. Year-aggregator folders (`2025_FAU`, `2024_DFG`, …) holding many trips, and the loose `<Surname>_DR####_*.pdf` settlement PDFs at the `TRAVEL-FORMS` top level, are not handled yet.
 
 ## Dashboard & registration
 
@@ -100,9 +117,17 @@ This file grows with every trip that gets worked through. Entries are short and 
 - **Closing = check the settlement letter** (`prompts/70_closing.md`): read the admin's settlement letter AND the submitted Reiseabrechnung, compare paid vs. claimed, explain differences in plain language, never invent figures (ask if it's a scan). On acceptance set `erstattet: true` + `status: closed`. This is an LLM reading task (portable), not a deterministic parser.
 - **Update flow (B):** when new docs arrive for an active trip, re-run bootstrap (sorts files) and update `trip.md` milestones — approval/trip number → `antrag_genehmigt`+`reisenummer`; booking → `reise_gebucht`/`hotel_gebucht`; sign-up → `angemeldet`. Booking only after approval.
 
+## Done since (closing out old entries)
+
+- ~~Centralize `identity.yaml`~~ — done July 2026: canonical location `TRAVEL-FORMS/personal/`, with a documented search order in the scripts (see "Personal files live outside the repo").
+- ~~Dashboard artifact~~ — built (`scripts/dashboard.py`, `prompts/50_dashboard.md`).
+- ~~Backlog mode~~ — built (`scripts/backlog_trip.py`, `prompts/40_backlog.md`).
+- ~~Calendar without a password prompt~~ — solved by the calmcp MCP server, July 2026.
+
 ## Open questions / next improvements
 
-- Centralize `identity.yaml` — currently lives in `TRAVEL-WORKFLOW-DEVEL/`, should later move to `~/.travel-forms-pilot/identity.yaml` per the concept.
-- `trip.md` minimal template — first version exists; refine after second real trip.
-- Dashboard artifact: worth building from the second real trip onwards.
-- Backlog mode: not yet built; worth doing once Cargèse is reimbursed and we've practiced the "lenient style" once for real.
+- `trip.md` minimal template — refine once a couple more real trips have gone through the `beitrag:` / `anmeldung:` blocks.
+- Backlog scope: year-aggregator folders (`2025_FAU`, `2024_DFG`, …) and the loose `<Surname>_DR####_*.pdf` settlement PDFs at the `TRAVEL-FORMS` top level are still not handled.
+- Quickie receipt-photo workflow (drop a photo, get it filed and captured) — not started.
+- Reiseabrechnung per-day repeating fields still use raw 0-based indices; alias them in `NAMED_FIELDS` as they come up.
+- Itinerary events could seed the Reiseabrechnung departure/arrival times via `find_events` — sketched in `prompts/60_calendar.md`, not yet exercised on a real trip.

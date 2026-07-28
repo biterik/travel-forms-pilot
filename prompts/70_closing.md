@@ -1,7 +1,7 @@
 # 70 — Closing a trip (check the administration's settlement letter)
 
 The final step. The user drops the Reisestelle's settlement letter (the
-"Reisekostenabrechnung / Festsetzung", often a `Bitzek_DR####_…_CM.pdf`) into the
+"Reisekostenabrechnung / Festsetzung", often a `<Surname>_DR####_…_CM.pdf`) into the
 trip folder. The pilot compares what was **paid** against what the user
 **claimed**, explains any differences, and — if it's right — closes the trip.
 

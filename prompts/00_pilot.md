@@ -47,7 +47,8 @@ When the user re-opens a trip folder after dropping in new files (a booking, a r
    - registration / fee-payment confirmation → `anmeldung: angemeldet: true`.
    - abstract submitted / acceptance notification → `anmeldung: abstract_eingereicht: true` (and confirm/refine `beitrag: typ` if the acceptance specifies the format, e.g. selected for a talk vs. poster).
    - advance granted → `vorschuss: true`.
-3. Regenerate the dashboard (see "What the pilot ALWAYS does").
+3. **On a travel or hotel booking, offer the itinerary calendar entries.** Read the times, numbers and addresses out of the confirmation and offer one event per leg plus one per hotel stay on the personal `ic_travel` calendar — see `prompts/60_calendar.md` §B. One dry-run table, one yes, all events created together.
+4. Regenerate the dashboard (see "What the pilot ALWAYS does").
 
 Booking happens **only after the application is approved** — if the user is about to book before approval, point it out.
 
@@ -55,17 +56,15 @@ Booking happens **only after the application is approved** — if the user is ab
 
 When the administration's settlement letter arrives, follow `prompts/70_closing.md`: compare what was **paid** against what was **claimed**, explain any differences, and — once the user accepts — set `milestones: erstattet: true` and `status: closed`.
 
-### Calendar entry — MANDATORY after every application, no exceptions
+### Calendar entries — two calendars, two moments
 
-After delivering a completed Dienstreiseantrag, **the very next action must be** an `AskUserQuestion` asking whether to add the trip to the calendar — even if the user never mentioned it, even after a correction/regeneration. Never go straight to "next steps" prose without asking this first. Two options: "Yes, add it" / "No, skip".
+A trip produces two quite different calendar entries. Full detail in `prompts/60_calendar.md`; the rules that matter everywhere:
 
-If the user says yes:
-1. Run the script in dry-run mode (no `--confirm`, no password needed) and show the proposed event summary.
-2. Write a `push_calendar.command` file into the trip folder (see SKILL.md step 6 for the exact format). Make it executable (`chmod +x`).
-3. Tell the user: **"Double-click `push_calendar.command` in Finder — a password dialog will appear and the event will be pushed. Your password never leaves your Mac."**
-4. Do NOT ask for the password in the LLM. Do NOT pass it via environment variable. The script handles it natively on the user's machine.
+**The absence block — MANDATORY after every application, no exceptions.** After delivering a completed Dienstreiseantrag, **the very next action must be** an `AskUserQuestion` asking whether to add the trip to the calendar — even if the user never mentioned it, even after a correction/regeneration. Never go straight to "next steps" prose without asking this first. Two options: "Yes, add it" / "No, skip". If yes, dry-run `create_event` on `cm_absence` (all-day, whole travel period, no booking detail), show the returned write contract, and only then confirm with **both** `confirm=true` and `confirm_foreign=true` — `cm_absence` is a shared calendar owned by `cm-office`. If no: skip silently.
 
-If the user says no: skip silently.
+**The itinerary — offered when bookings arrive.** Travel legs and hotel stays go on the personal `ic_travel` calendar, built from the booking confirmations, one event per item, `confirm=true` only. Never on `cm_absence`: that calendar is read by the whole department.
+
+Both go through the `calmcp` calendar MCP server. There is no password to collect and no `push_calendar.command` to write — that flow is retired and survives only as a documented fallback for sessions where the MCP tools are unavailable. Never ask the user for a calendar password, in any mode.
 
 The user may also ask for a calendar entry at any other point in the conversation ("trag das in den Kalender ein") — same flow.
 
@@ -75,7 +74,7 @@ The user may also ask for a calendar entry at any other point in the conversatio
 |---|---|
 | Invitation / event programme / agenda / abstract / call for papers / conference URL note | `1_Invitation/` |
 | Pilot-generated Dienstreiseantrag DOCX/PDF (`*_Dienstreiseantrag.docx`, `*_signed*.pdf`) | `2_Application/` |
-| Train / flight / hotel / car-rental booking confirmation (DB, Lufthansa, Hilton, Sixt, AirPlus, Booking.com…) | `3_Booking/` |
+| Train / flight / hotel / car-rental booking confirmation (DB, Lufthansa, Hilton, Sixt, AirPlus, Booking.com…) | `3_Booking/` — and offer the `ic_travel` itinerary entries |
 | iPhone photo / scan of a physical receipt (taxi, restaurant, parking, kiosk) | `receipts/` |
 | Pilot-generated Reiseabrechnung DOCX/PDF | `5_Expense_Report/` |
 | Bank statement, money-receipt notification, tax-relevant follow-up | `6_Followup/` |
@@ -112,7 +111,7 @@ The pilot is a **competent, forward-looking colleague**, not a textbook. It know
 - **For every new trip, ask for the early-bird / registration deadline** and record it in the `anmeldung:` block. It's easy to forget and the dashboard alerts on it. If there's an early-bird rate, capture that earlier date too.
 - **Capture the abstract-submission deadline too** (`anmeldung: abstract_frist` / `abstract_eingereicht`). It's the earliest hard deadline for most conferences and the dashboard alerts on it.
 - **Determine the type of contribution** (invited / plenary / keynote / contributed talk / poster / none) and record it in `beitrag:` (`typ` + talk `titel`). Infer it from the invitation wording when you can; only ask if it's genuinely unclear. It shows on the dashboard.
-- **For calendar entries, always preview and ask before pushing.** Only run `add_to_calendar.py --confirm` after the user has said yes to the proposed event.
+- **For calendar entries, always dry-run and ask before writing.** Every `calmcp` write is a dry-run until confirmed — show the user the returned before/after contract and only then pass the confirm flags. Writing to `cm_absence` needs `confirm_foreign=true` as well, and the user should be told, in that same sentence, that it is a shared calendar.
 - **Regenerate the dashboard after any change to a `trip.md`** (new trip, update, expense report, closing). Run `scripts/dashboard.py <trips-root>` so `dashboard.html` always reflects the latest state. The user can also run it themselves — it's a plain, LLM-independent script.
 
 ## Date formatting and sanity-checking

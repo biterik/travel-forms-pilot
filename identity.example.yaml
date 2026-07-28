@@ -1,0 +1,61 @@
+# Travel Forms Pilot — personal master data (EXAMPLE)
+#
+# Copy this file to `identity.yaml` and fill in your own values. The real file is
+# git-ignored and belongs OUTSIDE the repo. The scripts and the agent look for it
+# in this order, first hit wins:
+#
+#   1. $TFP_IDENTITY                     — explicit path to the file
+#   2. $TFP_PERSONAL_DIR/identity.yaml   — explicit personal directory
+#   3. <trips-root>/personal/            — the default, a sibling of your trip folders
+#   4. one level above the repo          — the pre-2026 location, still supported
+#   5. ~/.travel-forms-pilot/
+#
+#   cp identity.example.yaml ../../personal/identity.yaml
+#
+# This file is the single source of truth for the fields that go on every
+# application and expense report. Check it before a new application if anything
+# has changed — cost-centre schemes do get renumbered from time to time.
+
+name: Doe
+vorname: Jane
+personalnummer: "0000"           # your MPI personnel number
+abteilung: XY                    # department code as printed on the form
+wohnort: Düsseldorf              # place of residence — goes on the signature line
+email_dienstlich: j.doe@example.org
+
+kostenstellen:
+  default: W0000000              # cost centre charged unless a trip says otherwise
+  # weitere: []                  # further cost centres, for third-party-funded projects
+
+bonusprogramme:
+  miles_and_more: true           # tick the box on flights
+  bahnbonus: true                # tick the box on train trips
+  # Membership numbers deliberately NOT stored here — enter them on the form yourself.
+
+# ---------------------------------------------------------------------------
+# Calendar
+#
+# With the calmcp calendar MCP server (https://github.com/biterik/calendar-mcp-server)
+# you do NOT need anything here: calendar ids and CalDAV URLs live in that
+# server's calendars.yaml, and passwords live in your OS keyring. The pilot only
+# needs to know which calendar ids to write to, and those are in
+# config/<institute>.yaml (`kalender: absenz_calendar_id` / `reise_calendar_id`).
+#
+# The block below is ONLY for the fallback path — scripts/add_to_calendar.py in a
+# session without the MCP server. Delete it if you use the MCP server.
+# ---------------------------------------------------------------------------
+# kalender:
+#   caldav_url: "https://caldav.example.org/caldav/users/example.org/jdoe"
+#   login: jdoe
+#   app_password:                  # leave blank — the script prompts securely at runtime
+#   calendar_url: ""               # exact collection URL; highest priority, most reliable
+#   calendar_name: "Absence"       # fallback if calendar_url is empty
+#   shared_owner: ""               # login of the user who owns a calendar shared TO you
+#   alarm_days_before: 0           # reminder N days before trip start (0 = off)
+
+institut:
+  kurzname: MPI-SusMat
+  langname_alt: Max-Planck Institut für Eisenforschung GmbH Düsseldorf  # as printed on the forms
+  rechnungsadresse: Max-Planck-Institut für Eisenforschung GmbH
+  travel_mail: travel@example.org          # applications, expense reports, bonus-point reports
+  invoice_mail: invoice@example.org        # conference fees and seminar invoices go here directly

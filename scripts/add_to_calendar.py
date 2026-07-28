@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import platform
 import subprocess
 import sys
@@ -137,9 +138,42 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO_ROOT / "config" / "mpi-susmat.yaml"
-# identity.yaml lives one level ABOVE the repo so it never gets committed.
-DEFAULT_IDENTITY = REPO_ROOT.parent / "identity.yaml"
 LOCAL_TZ = "Europe/Berlin"
+
+
+def find_identity() -> Path:
+    """Locate identity.yaml, which deliberately lives OUTSIDE the repo.
+
+    Search order (first hit wins):
+      1. $TFP_IDENTITY                      — explicit file path
+      2. $TFP_PERSONAL_DIR/identity.yaml    — explicit personal directory
+      3. <repo>/../../personal/             — default: sibling of the trip folders
+      4. <repo>/../                         — the pre-2026 location
+      5. ~/.travel-forms-pilot/
+
+    Returns the first existing path, or the preferred default (3) if none exist,
+    so the error message points at where the file is supposed to go.
+    """
+    env_file = os.environ.get("TFP_IDENTITY")
+    if env_file:
+        return Path(env_file).expanduser()
+
+    candidates = []
+    env_dir = os.environ.get("TFP_PERSONAL_DIR")
+    if env_dir:
+        candidates.append(Path(env_dir).expanduser() / "identity.yaml")
+    candidates += [
+        REPO_ROOT.parent.parent / "personal" / "identity.yaml",
+        REPO_ROOT.parent / "identity.yaml",
+        Path.home() / ".travel-forms-pilot" / "identity.yaml",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0] if candidates else REPO_ROOT.parent / "identity.yaml"
+
+
+DEFAULT_IDENTITY = find_identity()
 
 
 # ----------------------------------------------------------------------------- parsing
@@ -165,9 +199,14 @@ def resolve_calendar_settings(args, identity: dict, config: dict) -> dict:
     """Merge calendar settings from CLI / identity.yaml / config defaults."""
     id_cal = (identity or {}).get("kalender", {}) or {}
     cfg_cal = (config or {}).get("kalender", {}) or {}
+    # CalDAV connection details moved under `kalender: fallback_caldav:` when the
+    # calmcp MCP server became the primary path. Accept both shapes.
+    cfg_fallback = cfg_cal.get("fallback_caldav", {}) or {}
 
     def pick(key, default=None):
-        return cfg_cal.get(key, default)
+        if key in cfg_cal:
+            return cfg_cal[key]
+        return cfg_fallback.get(key, default)
 
     settings = {
         "caldav_url": args.caldav_url or id_cal.get("caldav_url"),
