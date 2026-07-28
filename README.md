@@ -251,9 +251,30 @@ absence block (`pip install caldav icalendar`).
 
 ### 4. Tell your assistant about the skill
 
-See [Using with Claude](#using-with-claude) below — which mechanism applies
-depends on whether you run in the cloud or on your own machine. For non-Claude
-assistants see [Using with other LLMs](#using-with-other-llms).
+The repo ships a packaged skill in `skill/SKILL.md`. It is **thin by design**: it
+locates the repo on disk and states the rules that must never be broken, then
+reads everything else — behaviour, heuristics, field tables, trip history — from
+the repo itself. So it cannot drift out of sync with the scripts, and updating
+the pilot is just `git pull`.
+
+Build the bundle and install it:
+
+```bash
+cd skill && zip -r ../travel-forms-pilot.skill travel-forms-pilot 2>/dev/null || {
+  mkdir -p /tmp/skillbuild/travel-forms-pilot
+  cp SKILL.md /tmp/skillbuild/travel-forms-pilot/
+  (cd /tmp/skillbuild && zip -r travel-forms-pilot.skill travel-forms-pilot)
+}
+```
+
+Then save the `.skill` file into your assistant's skills. In Claude, ask it to
+package `skill/SKILL.md` as a skill and save it when offered — after that it is
+available in every session on every device, and a cloud Cowork task will pick up
+the pilot without any `CLAUDE.md`.
+
+See [Using with Claude](#using-with-claude) below for how this interacts with
+`CLAUDE.md`. For non-Claude assistants see
+[Using with other LLMs](#using-with-other-llms).
 
 ### 5. Use it
 
@@ -348,6 +369,8 @@ travel-forms-pilot/
 ├── CLAUDE.md.example         ← copy to your workspace root as CLAUDE.md
 ├── identity.example.yaml     ← copy to personal/identity.yaml and fill in
 ├── bonus_points.example.md   ← copy to personal/bonus_points.md
+├── skill/
+│   └── SKILL.md              ← thin installable skill: locates the repo + non-negotiables
 ├── prompts/
 │   ├── 00_pilot.md           ← base behavior: fast mode, batched questions
 │   ├── 40_backlog.md         ← backlog mode: import old, already-completed trips
@@ -571,7 +594,7 @@ hand-edit the DOCX.
 
 | Mechanism | What it is | Works in |
 |---|---|---|
-| **`SKILL.md` installed as a skill** | `SKILL.md` has skill frontmatter with a trigger description. Installed, it fires on "Dienstreiseantrag", "expense report", a `yyyymmdd_LOCATION_EVENT/` folder, and so on. | **everywhere** — Cowork in the cloud, Cowork on your computer, Claude Code |
+| **The installed skill** (`skill/SKILL.md`) | Fires on "Dienstreiseantrag", "expense report", a `yyyymmdd_LOCATION_EVENT/` folder, and so on. Locates the repo, then reads the full spec from it. | **everywhere** — Cowork in the cloud, Cowork on your computer, Claude Code |
 | **`CLAUDE.md` at the workspace root** | Read automatically at session start; chains `STATUS.md` → `SKILL.md` → `00_pilot.md` → `learnings.md` → `identity.yaml`. | Claude Code (CLI), and Cowork tasks running **on your computer** |
 
 **The important caveat.** A Cowork task running *in the cloud* reaches your disk
@@ -588,8 +611,9 @@ and is what makes `claude` in that folder behave correctly.
 1. **Connect the folder** that contains both `travel-forms-pilot/` and your trip
    folders — e.g. `~/Desktop/MPIE/TRAVEL-FORMS`. Connect the parent, not the repo:
    Claude needs to see the trip folders too.
-2. **Install the skill.** Point Claude at `travel-forms-pilot/SKILL.md` and ask it
-   to package the file as a skill for you; save it when offered.
+2. **Install the skill** — `travel-forms-pilot/skill/SKILL.md`, packaged as a
+   `.skill` file and saved to your account (installation step 4 above). This is
+   what makes cloud sessions find the pilot.
 3. **Copy `CLAUDE.md.example` to the connected folder root as `CLAUDE.md`** and
    adjust the paths. Belt and braces — see the caveat above.
 4. **Create `personal/identity.yaml`** from `identity.example.yaml` and fill it in.
