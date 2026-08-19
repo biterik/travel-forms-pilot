@@ -66,10 +66,13 @@ def classify(name: str):
     # Expense report (check before generic "antrag"/invoice keywords).
     if "reiseabrechnung" in low or "abrechnung" in low:
         return "5_Expense_Report"
-    # Reisestelle settlement confirmation (filename carries a DR number + name).
-    # Note: DR is often preceded by "_" so a \b boundary fails — use a letter lookbehind.
+    # A Reisestelle PDF whose filename carries a DR number + the surname is the
+    # APPROVED Dienstreiseantrag scanned back with the Reisenummer written in —
+    # NOT a settlement (learnings.md, 18 Aug 2026). It belongs with the
+    # application, and it is the authoritative source for the Reisenummer.
+    # Note: DR is often preceded by "_" so a \b boundary fails — use a lookbehind.
     if re.search(r"(?<![a-z])dr\d{3,}", low) and "bitzek" in low:
-        return "6_Followup"
+        return "2_Application"
     # Application + A1 certificate (application-specific tokens only — the bare
     # "signedEB" catch comes last so signed *non*-application forms don't land here).
     if ("dienstreiseantrag" in low or "antrag" in low
@@ -131,11 +134,24 @@ def parse_german_date(s: str):
 def extract_app_fields(pdf: Path) -> dict:
     """Pull destination / purpose / dates / cost center from an application front page."""
     out = {}
-    try:
-        text = subprocess.run(
-            ["pdftotext", "-layout", "-f", "1", "-l", "1", str(pdf), "-"],
-            capture_output=True, text=True, timeout=60).stdout
-    except Exception:
+    # An untrimmed application is 8 pages with an INDEX on page 1 — the actual
+    # form sits on page 2. Reading page 1 only produced garbage (ESMC Lyon 2025
+    # came out with destination ", F"). Scan the first few pages and use the one
+    # that actually carries the form.
+    text = ""
+    for page in (1, 2, 3):
+        try:
+            t = subprocess.run(
+                ["pdftotext", "-layout", "-f", str(page), "-l", str(page), str(pdf), "-"],
+                capture_output=True, text=True, timeout=60).stdout
+        except Exception:
+            return out
+        if "Reisezweck:" in t:
+            text = t
+            break
+        if page == 1:
+            text = t          # fall back to page 1 if no page carries the form
+    if not text:
         return out
 
     m = re.search(r"Reisezweck:\s*(.+)", text)
@@ -152,6 +168,42 @@ def extract_app_fields(pdf: Path) -> dict:
     if m:
         out["kostenstelle"] = m.group(1).strip()
     return out
+
+
+SETTLEMENT_MARKERS = (
+    "reisekostenabrechnung",
+    "abrechnung der dienstreise",
+    "auszahlungsbetrag",
+    "erstattungsbetrag",
+    "festsetzung der reisekosten",
+)
+APPROVAL_MARKER = "antrag auf genehmigung einer dienstreise"
+
+
+def pdf_first_pages_text(pdf: Path, pages: int = 2) -> str:
+    """Plain text of the first pages, lowercased. Empty string if unreadable."""
+    try:
+        return subprocess.run(
+            ["pdftotext", "-layout", "-f", "1", "-l", str(pages), str(pdf), "-"],
+            capture_output=True, text=True, timeout=60).stdout.lower()
+    except Exception:
+        return ""
+
+
+def looks_like_settlement(pdf: Path) -> bool:
+    """True only for a real settlement / Abrechnung document.
+
+    The Reisestelle mails back the APPROVED application (same form, Reisenummer
+    handwritten in). Those must never count as proof of reimbursement — that
+    mistake silently closed seven unclaimed trips in the June 2026 import.
+    A settlement is a different document and says so in its own words.
+    """
+    text = pdf_first_pages_text(pdf)
+    if not text:
+        return False                      # flattened scan, no text layer -> unknown
+    if APPROVAL_MARKER in text:
+        return False                      # it is an application, approved or not
+    return any(mark in text for mark in SETTLEMENT_MARKERS)
 
 
 def pick_app_fields(files) -> dict:
@@ -236,7 +288,10 @@ def resolve_values(folder_name: str, fields: dict) -> dict:
     'folder name', '= start date', 'default', or None) so the caller can show
     the user what was gleaned vs. guessed vs. missing.
     """
-    iso_date, location, event = parse_folder_name(folder_name)
+    # parse_folder_name returns a 4-tuple since yyyymm_ folders became the
+    # convention (19 Aug 2026); year_month is unused here — a backlog trip
+    # gets its dates from the application PDF, not from the folder name.
+    iso_date, location, event, _year_month = parse_folder_name(folder_name)
     ziel = fields.get("ziel") or location
     start = fields.get("datum_start") or iso_date
     end = fields.get("datum_ende") or start
@@ -320,7 +375,11 @@ def main():
     all_names = [p.name for p in all_files]
 
     # ---- detect artifacts / status
-    has_settlement = any(classify(n) == "6_Followup" for n in all_names)
+    # Settlement proof must come from the document's own text — a DR-numbered
+    # filename only tells us the Reisestelle sent something back, and what they
+    # send back is usually the approval.
+    has_settlement = any(p.suffix.lower() == ".pdf" and looks_like_settlement(p)
+                         for p in all_files)
     has_expense = any(classify(n) == "5_Expense_Report" for n in all_names)
     has_signed_app = any(("signedeb" in n.lower() or "signdeb" in n.lower()
                           or "dienstreiseantrag" in n.lower()) for n in all_names)
