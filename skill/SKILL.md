@@ -1,6 +1,6 @@
 ---
 name: travel-forms-pilot
-description: German academic business-trip paperwork (Dienstreise) for MPI-SusMat — travel applications, expense reports, calendar entries, and the trip dashboard. Use when the user mentions a business trip, a Dienstreiseantrag or travel application, a Reiseabrechnung or expense report, a per diem or Tagegeld, a trip number or Reisenummer, an A1 certificate, the Reisestelle, a booking or hotel confirmation for a work trip, a settlement letter, BahnBonus or Miles & More points, putting a trip in the calendar, or a trip folder named like `yyyymmdd_LOCATION_EVENT/`. Also use for "new trip", "build the application", "do the expense report", "close the trip", "how do my trips look". Understands German and English input; always replies in English.
+description: German academic business-trip paperwork (Dienstreise) for MPI-SusMat — travel applications, expense reports, calendar entries, and the trip dashboard. Use when the user mentions a business trip, a Dienstreiseantrag or travel application, a Reiseabrechnung or expense report, a per diem or Tagegeld, a trip number or Reisenummer, an A1 certificate, the Reisestelle, a booking or hotel confirmation for a work trip, a settlement letter, BahnBonus or Miles & More points, putting a trip in the calendar, or a trip folder named like `yyyymm_LOCATION_EVENT/`. Also use for "new trip", "build the application", "do the expense report", "close the trip", "how do my trips look". Understands German and English input; always replies in English.
 ---
 
 # Travel Forms Pilot — entry point
@@ -28,7 +28,7 @@ Erik's layout (July 2026):
 │   ├── STATUS.md
 │   └── travel-forms-pilot/             ← the repo
 ├── dashboard.html
-└── <trip folders>/                     ← yyyymmdd_LOCATION_EVENT
+└── <trip folders>/                     ← yyyymm_LOCATION_EVENT
 ```
 
 **If you cannot find the repo, say so and stop.** Ask the user to connect the

@@ -6,6 +6,45 @@ This file grows with every trip that gets worked through. Entries are short and 
 
 ## Style & behavior
 
+- **Name form entries by their printed label, never by index.** Erik, 18.8.2026:
+  *"I do not see the numbers you are referring to, they do not show up in the
+  form. Always ask about the entries with the entry title!"* Say "**km:** under
+  **Fahrtkosten / Privat-KFZ**", not "field 79". Indices belong in the configs,
+  the scripts and `docs/formular_mechanik.md` — never in conversation. Full rule
+  and a say-this/not-this table in `prompts/00_pilot.md`.
+
+- **Never fill the "Betrag €" columns of the Reiseabrechnung.** Erik, 18.8.2026:
+  *"never put yourself anything in the columns Betrag Euro, that is for the
+  Dienstreisestelle to fill in. We just fill in the stuff on the left."* We supply
+  facts (dates, times, km, Bemerkungen); they compute every euro figure. Now
+  enforced in `fill_expense.py` via `RESERVED_BETRAG_FIELDS` (58 indices) — the
+  script refuses the run rather than producing a form that pre-empts their
+  calculation. See the rule table in `prompts/00_pilot.md`.
+  **Scope, confirmed by Erik 18.8.2026:** only the right-hand `Betrag €`
+  (`Inland`/`Ausland`) boxes are off limits. The `€` on the writing line to the
+  LEFT — on *vom MPI bezahlt*, *Vorschuss erhalten*, *Erstattungsbetrag durch
+  Dritte*, the *Fahrtkosten* rows and *Sonstige Ausgaben lt. Beleg* — **is ours
+  to fill**. For out-of-pocket spend: *"Description + € on the left line."*
+
+- **The Antrag on disk is a SNAPSHOT, not the authoritative version.** Erik
+  routinely discusses a trip with the Reisekostenstelle and they **amend their own
+  copy** — means of transport, travel dates, private extension — without the
+  amended version ever coming back to the trip folder. Stated by Erik 18.8.2026
+  after the pilot flagged the 17.7.2026 trip as "deviates from the approved
+  Antrag" (he had driven a private car; the Reisestelle had already agreed it).
+  Therefore: when the reality Erik describes differs from the scanned Antrag,
+  **ask whether it was cleared with the Reisestelle** before framing it as a
+  deviation. Report the difference as an observation, never as a problem with
+  what he did. His verbal account of what was agreed outranks the PDF on disk.
+
+- **ONE TRIP AT A TIME — and wait for an explicit "ok".** See the hard rule at the
+  top of `prompts/00_pilot.md`. On 18.8.2026 Erik asked for a batch of ~11 trips to
+  be inventoried and then settled "one by one"; he said so twice. The pilot
+  inventoried, then ingested, then built a draft for a trip he had not selected,
+  then moved on again. His words: *"I said repeatedly to do one Travel after the
+  other, and to go on only if I say explicitly ok."* A batch request is a
+  **worklist, not a work order**. `[No preference]` is not consent to proceed.
+
 - **Don't repeat standard MPI rules.** Erik knows them. Don't list them every time: book only after approval, declare bonus programmes, 70-€ inland hotel rule, 3-month expense-report deadline, ARV per diems for abroad. Mention only when the concrete trip triggers an exception.
 - **Co-lecturers / other speakers are irrelevant to the application.** Don't list them in the briefing — they go neither into the form nor into the justification.
 - **In the briefing only mention what is new or decision-relevant for this trip.** No textbook recap of the mechanics — what's different here, what does Erik have to decide, where are the gaps.
@@ -29,7 +68,7 @@ This file grows with every trip that gets worked through. Entries are short and 
 
 ## Conventions that have worked
 
-- **Trip folder name:** `yyyymmdd_LOCATION_EVENT/` with the trip start date.
+- **Trip folder name:** `yyyymm_LOCATION_EVENT/` with the trip's start month (since 19.8.2026; `yyyymmdd_` is still accepted, see the entry below).
 - **Subfolder structure (English):** `1_Invitation/`, `2_Application/`, `3_Booking/`, `receipts/`, `5_Expense_Report/`, `6_Followup/`
 - **File naming in `2_Application/`:** `<yyyymmdd-tripstart>_<shortname>_Dienstreiseantrag.docx` (example: `20260906_Cargese-MecaNano_Dienstreiseantrag.docx`). After signature in parallel as `…_signedEB.pdf`.
 
@@ -133,10 +172,104 @@ If a session goes wrong from the start (wrong approach, ignoring the scripts, ha
 - ~~Backlog mode~~ — built (`scripts/backlog_trip.py`, `prompts/40_backlog.md`).
 - ~~Calendar without a password prompt~~ — solved by the calmcp MCP server, July 2026.
 
+## Reisestelle PDFs: approval ≠ settlement (found 18 Aug 2026)
+
+The PDFs the Reisestelle mails back, named `Bitzek_6568_DR####_<dates>_<place>.pdf`
+(or `Prof.Bitzek_...`), are **the approved Dienstreiseantrag** — the same form you
+submitted, scanned back with the **Reisenummer handwritten** into the box and the
+`Bearbeitungsvermerke` signed. They are **not** a settlement / DR-Abrechnung and
+they are **not** proof of reimbursement.
+
+`backlog_trip.py` treats the presence of such a file as settlement proof and sets
+`status: closed` + `abrechnung_eingereicht: true` + `erstattet: true`. That is
+wrong. Verified on five of them (DR6129, DR6228, DR6008, DR5814, DR6001, DR5729):
+every one is an approval. It silently hid **seven** unclaimed trips from the
+dashboard's action list, including one (`20260423_Erlangen_AMMP-Vorlesung`,
+DR6008) whose `trip.md` had been sitting at `closed` since the June 2026 import.
+
+Rules that follow:
+
+- These files belong in **`2_Application/`**, not `6_Followup/`. They are the
+  authoritative source for the **Reisenummer** — read it off the scan when the
+  filename omits it (that is how DR6228 for 17.7.2026 was recovered).
+- **Real settlement proof** is a different document: the Reisestelle's
+  Abrechnung/settlement letter showing amounts paid. Only that justifies
+  `erstattet: true` / `status: closed`.
+- The Reisestelle sometimes **hand-corrects the travel dates** on the approval.
+  `2026-RUB` was applied for as 2.–5.2.2026 and approved as **2.–5.3.2026** —
+  the approval wins over both the application text and the folder name.
+- **`backlog_trip.py` needs fixing**: distinguish approval from settlement (an
+  approval still carries the `Antrag auf Genehmigung einer Dienstreise` title and
+  an empty/handwritten Reisenummer box). Until then, always eyeball the milestones
+  it proposes and never accept `erstattet: true` from a filename alone.
+
+## Year-aggregator folders in practice
+
+`2026-RUB`, `2026_Aachen`, `2026-DFG` each turned out to hold exactly **one** trip,
+so `backlog_trip.py` handled them fine despite the non-conforming names — but the
+name carries no date, so `bootstrap_trip.py` can't pre-fill and the dashboard
+sorts them oddly. Consider renaming to `yyyymm_LOCATION_EVENT` on next touch.
+
 ## Open questions / next improvements
 
 - `trip.md` minimal template — refine once a couple more real trips have gone through the `beitrag:` / `anmeldung:` blocks.
+- **`backlog_trip.py`: approval-vs-settlement detection** (see the 18 Aug 2026 entry) — highest-value fix.
 - Backlog scope: year-aggregator folders (`2025_FAU`, `2024_DFG`, …) and the loose `<Surname>_DR####_*.pdf` settlement PDFs at the `TRAVEL-FORMS` top level are still not handled.
 - Quickie receipt-photo workflow (drop a photo, get it filed and captured) — not started.
 - Reiseabrechnung per-day repeating fields still use raw 0-based indices; alias them in `NAMED_FIELDS` as they come up.
 - Itinerary events could seed the Reiseabrechnung departure/arrival times via `find_events` — sketched in `prompts/60_calendar.md`, not yet exercised on a real trip.
+
+## Recurring lecture series: recollection can attach to the wrong date (19 Aug 2026)
+
+The FAU AMMP lecture repeats every few weeks with the same destination, the same
+purpose and the same 14:00-ish slot, so the trips are near-identical in memory.
+On 18.8.2026 Erik described the **26.6.** trip as a Privat-PKW journey with a
+Thursday-evening departure and a private weekend — that is in fact the **12.6.**
+trip. Confirmed by him on 19.8.2026 once the documents were laid side by side.
+
+What settled it (in order of usefulness):
+
+1. The **DB Kaufbeleg** — reservation *Leistungsdatum*, not the purchase date,
+   pins the actual travel day. `pdftotext -layout` on the receipt shows both.
+2. The payment method — a *zentrale Firmenkreditkarte* charge means the trip was
+   taken by train, whatever anyone remembers.
+3. `ic_orga` "Fahrt nach Hauptbahnhof, Düsseldorf" — a drive-to-the-station event
+   on the morning in question is direct evidence of a rail trip.
+
+So: in a recurring series, **date-stamp the recollection against a receipt before
+building anything**, and say plainly which document you are following. Also worth
+knowing: the `ic_lehre` block for the lecture (13:00–18:15) is wider than the
+actual Dienstgeschäft — ask, don't infer. Here it was 13:15–17:00, whereas the
+22.5. report used 14:00–17:00.
+
+## Folder naming moved to `yyyymm_` (19 Aug 2026)
+
+Erik renamed six trip folders from `yyyymmdd_` to `yyyymm_`
+(`20260723_MPGLeadership-Muenchen` -> `202607_MPGLeadership-Muenchen`, and the
+same for DFG Hamburg, Koenigswinter, Cargese, Melbourne, Portland) so the 2026
+folders sort consistently with the ones that were already `yyyymm_`. **`yyyymm_`
+is now the convention for new trips**; `yyyymmdd_` folders are still accepted and
+are not worth renaming on their own.
+
+What the rename touched, and what it did not:
+
+- **`bootstrap_trip.py` had to change.** Its `parse_folder_name` only matched an
+  8-digit date, so a `yyyymm_` folder got no pre-fill at all. It now recognises
+  `yyyymm_` as a fourth shape, returns a `year_month`, and leaves `datum_start`
+  as the `YYYY-MM-DD` placeholder with a comment naming the month. Deliberate:
+  a half-known date must not look like a real one to the dashboard.
+- **Generated file names did NOT change.** The convention there is the trip
+  *start date* — `20260713_Koenigswinter_SusMet-Retreat_Reiseabrechnung.pdf`
+  inside `202607_Koenigswinter_SusMet-Retreat/` is correct, not stale. Don't
+  "fix" these.
+- **`trip.md` files were unaffected** — every path in them is relative.
+- **Calendar UIDs went stale.** The absence-block UID embeds the folder name
+  (`travel-forms-pilot-<folder>@mpie.de`), so a renamed folder no longer matches
+  its event and a fresh push would duplicate rather than update. Two trips were
+  affected (DFG Hamburg, MPG Muenchen); both now carry `kalender: legacy_uid:`
+  in their `trip.md`. **Check for this on every future folder rename** — it is
+  the one consequence that is invisible until it misfires.
+
+The installed `travel-forms-pilot` skill is a separate copy: after editing
+`skill/SKILL.md` in the repo, the account-level skill has to be re-synced or a
+cloud session will keep loading the old text.

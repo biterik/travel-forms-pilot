@@ -39,7 +39,7 @@ nothing is locked to one LLM or one operating system.
 
 ### A — New business trip
 
-1. Create a folder named `yyyymmdd_LOCATION_EVENT/` and drop in whatever you
+1. Create a folder named `yyyymm_LOCATION_EVENT/` and drop in whatever you
    have (invitation, programme, links).
 2. Open the assistant in your `TRAVEL-FORMS` directory and point it at the
    folder. It scaffolds the folder, sorts your files, fills in `trip.md`, and
@@ -189,7 +189,7 @@ TRAVEL-FORMS/                    ← the folder you connect to your assistant
 │   ├── identity.yaml            ← your personnel number, cost centre, department
 │   └── bonus_points.md          ← running BahnBonus / Miles & More balance
 ├── travel-forms-pilot/          ← this repo
-├── 20260901_Cargese_MecaNano-school/   ← trip folders, siblings of the repo
+├── 202609_Cargese_MecaNano-school/   ← trip folders, siblings of the repo
 └── 202609_ISAM5_Tokyo/
 ```
 
@@ -279,7 +279,7 @@ See [Using with Claude](#using-with-claude) below for how this interacts with
 ### 5. Use it
 
 ```
-"New trip: 20260901_Cargese_MecaNano-school/ — I dropped the invitation
+"New trip: 202609_Cargese_MecaNano-school/ — I dropped the invitation
  and the flight booking in there."
 ```
 
@@ -295,7 +295,7 @@ commands to memorise.
 
 | You say | What happens |
 |---|---|
-| *"New trip: `20260901_Cargese_MecaNano-school/`, invitation is in there"* | Folder scaffolded, files sorted, `trip.md` filled, one round of questions, **Dienstreiseantrag PDF** — then "add to calendar?" |
+| *"New trip: `202609_Cargese_MecaNano-school/`, invitation is in there"* | Folder scaffolded, files sorted, `trip.md` filled, one round of questions, **Dienstreiseantrag PDF** — then "add to calendar?" |
 | *"The approval came back, trip number DR6129"* | `reisenummer` + `antrag_genehmigt` set, dashboard refreshed. Now you may book. |
 | *"I booked the ICE and the hotel"* | Files sorted into `3_Booking/`, milestones set, and the **travel legs + hotel** offered as events on your `ic_travel` calendar |
 | *"I registered / the abstract is in"* | `anmeldung:` block updated, deadline alerts clear from the dashboard |
@@ -427,7 +427,7 @@ managed by the [calendar MCP server](https://github.com/biterik/calendar-mcp-ser
 `identity.yaml` only needs a `kalender:` block if you're on the
 `add_to_calendar.py` fallback path, and the example file has it commented out.
 
-Your trip folders (`yyyymmdd_LOCATION_EVENT/`) also sit outside the repo. The
+Your trip folders (`yyyymm_LOCATION_EVENT/`) also sit outside the repo. The
 `.gitignore` is set up so that if any of this accidentally lands inside the repo,
 it still won't be committed.
 
@@ -435,7 +435,7 @@ it still won't be committed.
 
 The user does the absolute minimum per trip:
 
-1. **Create a folder** named `yyyymmdd_LOCATION_EVENT/` somewhere on disk (e.g. `~/Desktop/Trips/20260901_Cargese_MecaNano-school/`).
+1. **Create a folder** named `yyyymm_LOCATION_EVENT/` somewhere on disk (e.g. `~/Desktop/Trips/202609_Cargese_MecaNano-school/`).
 2. **Drop stuff into it** — invitations, programme PDFs, train/flight bookings, receipt photos — at the top level. No manual sorting.
 3. **Tell the LLM**: *"New trip, here's the folder."*
 
@@ -519,7 +519,7 @@ locally — it never reaches the LLM.
 Per-trip folder convention (the agent maintains this for you):
 
 ```
-yyyymmdd_LOCATION_EVENT/
+yyyymm_LOCATION_EVENT/
 ├── trip.md
 ├── 1_Invitation/
 ├── 2_Application/
@@ -594,7 +594,7 @@ hand-edit the DOCX.
 
 | Mechanism | What it is | Works in |
 |---|---|---|
-| **The installed skill** (`skill/SKILL.md`) | Fires on "Dienstreiseantrag", "expense report", a `yyyymmdd_LOCATION_EVENT/` folder, and so on. Locates the repo, then reads the full spec from it. | **everywhere** — Cowork in the cloud, Cowork on your computer, Claude Code |
+| **The installed skill** (`skill/SKILL.md`) | Fires on "Dienstreiseantrag", "expense report", a `yyyymm_LOCATION_EVENT/` folder, and so on. Locates the repo, then reads the full spec from it. | **everywhere** — Cowork in the cloud, Cowork on your computer, Claude Code |
 | **`CLAUDE.md` at the workspace root** | Read automatically at session start; chains `STATUS.md` → `SKILL.md` → `00_pilot.md` → `learnings.md` → `identity.yaml`. | Claude Code (CLI), and Cowork tasks running **on your computer** |
 
 **The important caveat.** A Cowork task running *in the cloud* reaches your disk
@@ -675,9 +675,9 @@ The web UI lets you upload files as context but can't write to your disk or run 
 
 1. In a local terminal, scaffold the trip folder yourself:
    ```bash
-   mkdir ~/Desktop/Trips/20260901_Cargese_MecaNano-school
+   mkdir ~/Desktop/Trips/202609_Cargese_MecaNano-school
    # drop your invitation / programme / booking PDFs into that folder
-   python travel-forms-pilot/scripts/bootstrap_trip.py ~/Desktop/Trips/20260901_Cargese_MecaNano-school
+   python travel-forms-pilot/scripts/bootstrap_trip.py ~/Desktop/Trips/202609_Cargese_MecaNano-school
    ```
 2. In Chat AI: paste `SKILL.md` and `prompts/00_pilot.md` into the **System prompt**.
 3. Attach the freshly-generated `trip.md`, your `identity.yaml`, and any invitation/programme PDFs.

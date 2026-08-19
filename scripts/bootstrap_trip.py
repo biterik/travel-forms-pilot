@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """Scaffold a trip folder so the user has to do as little setup as possible.
 
-The user creates a folder named like `20260901_Cargese_MecaNano-school/` and
+The user creates a folder named like `202609_Cargese_MecaNano-school/` and
 drops invitations / programmes / bookings / receipts into it. This script then:
 
   1. Creates the canonical subfolders (1_Invitation/, 2_Application/, …) if missing.
   2. Copies `templates/trip.md.tmpl` into the folder as `trip.md` if missing.
   3. Pre-fills the YAML header of trip.md with what can be inferred from the
-     folder name: start date (yyyymmdd → ISO), location, event name.
+     folder name: start date, location, event name.
+
+Folder-name shapes, in order of preference (all are accepted):
+
+  202609_Cargese_MecaNano-school      yyyymm   — the current convention
+  20260901_Cargese_MecaNano-school    yyyymmdd — older folders, still fine
+  2026-09-01_Cargese_MecaNano-school  hyphenated ISO
+
+With a yyyymm name the day is unknown, so `datum_start` keeps its YYYY-MM-DD
+placeholder and gets a comment naming the month — the agent fills the exact
+day from the invitation.
 
 The script is idempotent: running it twice does nothing the second time.
 File-sorting (deciding which dropped file goes into which subfolder) is left
@@ -38,12 +48,17 @@ DEFAULT_TEMPLATE = (Path(__file__).resolve().parent.parent
 
 
 def parse_folder_name(name: str):
-    """Extract (iso_date, location, event_guess) from a trip-folder name.
+    """Extract (iso_date, location, event_guess, year_month) from a folder name.
 
-    Returns (date_iso or None, location or None, event or None).
+    Returns (date_iso or None, location or None, event or None,
+             year_month or None).
+
+    ``year_month`` is set only for the yyyymm shape, where the day is unknown;
+    in that case ``date_iso`` is None and the caller keeps the placeholder.
 
     Recognized shapes:
-      20260901_Cargese_MecaNano-school
+      202609_Cargese_MecaNano-school      (yyyymm — current convention)
+      20260901_Cargese_MecaNano-school    (yyyymmdd)
       20260522-FAU-Erlangen
       2026-09-01_Cargese_MecaNano-school
     """
@@ -53,25 +68,45 @@ def parse_folder_name(name: str):
         # 2. Hyphenated ISO date prefix
         m = re.match(r"^(\d{4})-(\d{2})-(\d{2})[_\-](.+)$", name)
     if not m:
-        return None, None, None
+        # 3. yyyymm — month only, no day
+        mm = re.match(r"^(\d{4})(\d{2})[_\-](.+)$", name)
+        if mm:
+            year, mon, rest = mm.groups()
+            location, event = _split_rest(rest)
+            return None, location, event, f"{year}-{mon}"
+        return None, None, None, None
 
     year, mon, day, rest = m.groups()
     iso = f"{year}-{mon}-{day}"
 
     # Split `rest` on _ or - to get (location, event). First token is location
     # (typically a city), remainder joined back as event.
+    location, event = _split_rest(rest)
+    return iso, location, event, None
+
+
+def _split_rest(rest: str):
+    """Split the part after the date prefix into (location, event)."""
     parts = re.split(r"[_\-]", rest, maxsplit=1)
     if len(parts) == 1:
-        return iso, parts[0] or None, None
-    location, event = parts[0] or None, parts[1].replace("-", " ").replace("_", " ").strip() or None
-    return iso, location, event
+        return parts[0] or None, None
+    return (parts[0] or None,
+            parts[1].replace("-", " ").replace("_", " ").strip() or None)
 
 
-def prefill_trip_md(content: str, *, iso_date=None, location=None, event=None) -> str:
+def prefill_trip_md(content: str, *, iso_date=None, location=None, event=None,
+                    year_month=None) -> str:
     """Replace placeholder values in the trip.md YAML header with what we know."""
     if iso_date:
         content = re.sub(r"^datum_start: YYYY-MM-DD.*$",
                          f"datum_start: {iso_date}",
+                         content, count=1, flags=re.MULTILINE)
+    elif year_month:
+        # yyyymm folder: month known, day not. Keep the placeholder so nothing
+        # downstream mistakes a half-known date for a real one.
+        content = re.sub(r"^datum_start: YYYY-MM-DD.*$",
+                         f"datum_start: YYYY-MM-DD   "
+                         f"# folder says {year_month} — fill in the day",
                          content, count=1, flags=re.MULTILINE)
     if location:
         # location may be e.g. "Cargese" — the trip.md template comment suggests
@@ -114,13 +149,15 @@ def main():
         if not tmpl.exists():
             sys.exit(f"trip.md template not found: {tmpl}")
         content = tmpl.read_text(encoding="utf-8")
-        iso_date, location, event = parse_folder_name(trip.name)
+        iso_date, location, event, year_month = parse_folder_name(trip.name)
         content = prefill_trip_md(content,
                                   iso_date=iso_date,
                                   location=location,
-                                  event=event)
+                                  event=event,
+                                  year_month=year_month)
         trip_md.write_text(content, encoding="utf-8")
-        prefilled = [k for k, v in dict(date=iso_date, location=location,
+        prefilled = [k for k, v in dict(date=iso_date, month=year_month,
+                                        location=location,
                                         event=event).items() if v]
         trip_md_action = (f"created (pre-filled: {', '.join(prefilled)})"
                           if prefilled else "created")

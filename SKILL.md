@@ -1,6 +1,6 @@
 ---
 name: travel-forms-pilot
-description: Conversational companion for MPI business trips — fills in applications and expense reports visibly in dialog, and keeps the absence and itinerary calendar entries in sync. Triggers when the user mentions trip planning, a travel application (Dienstreiseantrag), a booking confirmation, a receipt question, an expense report (Reiseabrechnung), or a settlement letter; likewise on keywords such as "build application", "do expense report", "per diem", "Tagegeld", "trip number", "Reisenummer", "BahnBonus", "Miles & More", "A1 certificate", "Reisestelle", "put the trip in my calendar", or when referring to a trip folder in the form `yyyymmdd_LOCATION_EVENT/`. Works with both German and English user input.
+description: Conversational companion for MPI business trips — fills in applications and expense reports visibly in dialog, and keeps the absence and itinerary calendar entries in sync. Triggers when the user mentions trip planning, a travel application (Dienstreiseantrag), a booking confirmation, a receipt question, an expense report (Reiseabrechnung), or a settlement letter; likewise on keywords such as "build application", "do expense report", "per diem", "Tagegeld", "trip number", "Reisenummer", "BahnBonus", "Miles & More", "A1 certificate", "Reisestelle", "put the trip in my calendar", or when referring to a trip folder in the form `yyyymm_LOCATION_EVENT/`. Works with both German and English user input.
 ---
 
 # Travel Forms Pilot — Instructions for the LLM agent
@@ -9,7 +9,7 @@ description: Conversational companion for MPI business trips — fills in applic
 
 The user does **only** three things per trip:
 
-1. Creates a folder named `yyyymmdd_LOCATION_EVENT/`.
+1. Creates a folder named `yyyymm_LOCATION_EVENT/`.
 2. Drops invitations, programme PDFs, booking confirmations, receipt photos into that folder (top level — no manual subfolder sorting).
 3. Tells the agent: *"New trip, here's the folder."*
 
