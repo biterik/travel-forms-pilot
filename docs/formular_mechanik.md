@@ -126,9 +126,125 @@ Internal recipe (implemented in `DocxForm.trim_application_with_a1` / `trim_inla
 
 ## Reiseabrechnung — field overview
 
-140 FORMTEXT fields, 24 checkboxes. The structure is a small header followed by a long repeating per-day block (date, departure/arrival times, "Abwesenheit" hours, meal-received checkboxes, hotel/per-diem amounts) plus summary fields at the end.
+140 FORMTEXT fields, 24 checkboxes. **Mapping recovered 18 Aug 2026** by diffing a
+filled report (`20260522_FAU-Erlangen`) against the blank template and confirming the
+stride against the label context of all 140 fields.
 
-Only a few header fields are aliased in `fill_expense.py` so far. The full mapping isn't documented yet — most fields stay empty for any given trip. To extend:
+### Header (indices 0–8)
+
+| Idx | Field | Alias |
+|---:|---|---|
+| 0 | Name | `name` |
+| 1 | Personal-Nr. | `personalnummer` |
+| 2 | Reiseziel | `reiseziel` |
+| 3 | Pauschalerstattung € | `pauschal_erstattung_eur` |
+| 4 | Reisezweck | `reisezweck` |
+| 5 | Kostenstelle | `kostenstelle` |
+| 6 | Wohnort | `wohnort` |
+| 7 | Reise genehmigt am | `reise_genehmigt_am` |
+| 8 | … von | `reise_von` |
+
+### Per-day block — SIX rows, stride 11, first row at index 9
+
+Row *n* (0-based) starts at `9 + 11*n` → **9, 20, 31, 42, 53, 64**.
+
+| Offset | Field | Alias (row 1) |
+|---:|---|---|
+| +0 | Datum | `tag1_datum` |
+| +1 | Abfahrt | `tag1_abfahrt` |
+| +2 | An-/Rückkunft | `tag1_rueckkunft` |
+| +3 | Beginn Dienstgeschäft | `tag1_beginn_dienstgeschaeft` |
+| +4 | Ende Dienstgeschäft | `tag1_ende_dienstgeschaeft` |
+| +5 | Bemerkungen (upper line, by the M:/A: boxes) | `tag1_bemerkung` |
+| +6 | Frühstück — Inland € | `tag1_fruehstueck_inland` |
+| +7 | Frühstück — Ausland € | `tag1_fruehstueck_ausland` |
+| +8 | Bemerkungen (lower line, by the F: box) | `tag1_bemerkung2` |
+| +9 | Übernachtung — Inland € | `tag1_uebernachtung_inland` |
+| +10 | Übernachtung — Ausland € | `tag1_uebernachtung_ausland` |
+
+Aliases `tag1_…` … `tag6_…` are generated automatically; `day_field(row, key)` gives
+the raw index.
+
+### Summary block
+
+| Idx | Field | Alias |
+|---:|---|---|
+| 75/76 | Summe 1 Frühstück Inland / Ausland | `summe1_fruehstueck_inland` / `…_ausland` |
+| 77/78 | Summe 2 Übernachtung Inland / Ausland | `summe2_uebernachtung_inland` / `…_ausland` |
+| 79/80/81 | Privat-KFZ: km / **Inland €** / **Ausland €** | `pkw_km` / `pkw_inland` / `pkw_ausland` |
+| 83–100 | Fahrtkosten rows (4×), *only if the employee paid* | raw indices |
+| 101/102 | Summe 3: Fahrtkosten — Inland / Ausland | `summe3_fahrtkosten` / `…_ausland` |
+| 104–118 | Sonstige Ausgaben lt. Beleg (4 rows) | raw indices |
+| 119 | Summe 4 | `summe4_sonstige` |
+| 121 | Summe 5 | `summe5` |
+| 123 | Erstattungsbetrag durch Dritte (Feld 6) | `erstattung_dritte_eur` |
+| 125 | Auszahlungsbetrag (Summe 7) | `auszahlungsbetrag` |
+| **126** | **"vom MPI bezahlt" free text (Feld 8)** | `vom_mpi_bezahlt_text` |
+| **127** | **…€** | `vom_mpi_bezahlt_eur` |
+| 131 | Vorschuss erhalten € | `vorschuss_eur` |
+| 134 | Gesamtreisekosten | `gesamtreisekosten` |
+| 135 | Datum (Unterschrift Reisender) | `datum_unterschrift` |
+| 136 | Datum (Prüfung — leave blank) | `datum_pruefung` |
+
+**The distinction that matters:** *Fahrtkosten* (Summe 3) and *Sonstige Ausgaben*
+(Summe 4) are explicitly "sofern von Mitarbeitern bezahlt" — only out-of-pocket
+spend. A ticket paid on the **central company credit card / AirPlus** does **not**
+belong there; it goes into **Feld 8 (126/127), "vom MPI bezahlt"**, named
+explicitly. Putting it in Summe 3 would claim a reimbursement Erik never paid for.
+
+### Two kinds of `€` on this form — only one is off limits
+
+Erik, 18.8.2026, confirmed the split:
+
+- **`Betrag €` — `Inland` / `Ausland`, the boxes on the far right.** NEVER ours.
+  The Reisekostenstelle computes and enters every figure there.
+- **The `€` on the writing line to the LEFT**, on *vom MPI bezahlt (bitte
+  benennen)*, *Vorschuss erhalten*, *Erstattungsbetrag durch Dritte*, the four
+  *Fahrtkosten* rows and the four *Sonstige Ausgaben lt. Beleg* rows. **These are
+  ours to fill.** For out-of-pocket spend the instruction is *"Description + €
+  on the left line"* — name the expense and give the amount, so they can check it
+  against the receipt.
+
+### The `Betrag €` columns are OFF LIMITS
+
+In every table on this form the **last two cells of a row are the Inland and
+Ausland money columns**, and those are the Reisekostenstelle's to fill — never
+ours. `fill_expense.py` enforces it with `RESERVED_BETRAG_FIELDS` (58 indices)
+and exits with an error if a config targets one; `--allow-betrag` overrides only
+on Erik's explicit instruction.
+
+Left-side fields that ARE ours, and are easy to confuse with money columns:
+`79` (Privat-KFZ **km**) and `126`/`127` (the "vom MPI bezahlt" description and
+its € — these sit left of the money columns; Erik filled 127 himself on the
+signed 20260522 report).
+
+### Gotcha found on first real use (18 Aug 2026)
+
+In the Privat-KFZ row the printed `€` glyph is **static text**, not a field. The
+two FORMTEXT fields after `km:` are the **Inland** and **Ausland** money columns —
+so `80` is Inland and `81` is Ausland, *not* "amount" and "Inland". Filling both
+on a domestic trip puts a euro figure in the Ausland column. Same shape for
+Summe 3 (101 = Inland, 102 = Ausland).
+
+**Rendering the PDF once is justified the first time a newly recovered index is
+used on a money field** — this is the exception to "don't re-inspect outputs",
+which assumes an already-validated mapping.
+
+### Checkbox map (24 literal ☐ glyphs, 0-based)
+
+| Idx | Checkbox |
+|---:|---|
+| 0 | Verbindung der Reise mit Urlaub |
+| 1–18 | per-day meals: day *n* (0-based) → M = 1+3n, A = 2+3n, F = 3+3n |
+| 19 | bei Auslandsreisen: Mittagsverpflegung in einer Kantine |
+| 20 | an Mitarbeiter gezahlter Zuschussbetrag |
+| 21 | Erstattungsbetrag durch Dritte |
+| 22 | Vorschuss erhalten |
+| 23 | auf Dienstreise erkrankt |
+
+Helper: `meal_checkbox(row, 'M'|'A'|'F')`.
+
+To extend the mapping further:
 
 1. Unpack the template and inspect:
    ```bash

@@ -83,6 +83,90 @@ When in doubt between `3_Booking/` and `receipts/`: bookings are *prospective* (
 
 When the filename is opaque (e.g. `IMG_5421.HEIC`), look at the image content if possible or ask the user.
 
+## ONE TRIP AT A TIME — hard rule
+
+**Work on exactly one trip. Finish it. Stop. Wait for an explicit "ok" from the
+user before touching the next one.**
+
+This is not a style preference, it is a hard gate. Erik stated it repeatedly on
+18.8.2026 and the pilot ran past it anyway, which is what made the session
+unusable for him.
+
+What "one trip at a time" means concretely:
+
+- When the user names a batch of trips, the batch is a **worklist, not a
+  work order**. Inventory it if asked, then ask which single trip to start with
+  and work only on that one.
+- **Do not** build, draft, generate or pre-fill anything for trip N+1 while trip
+  N is open — not "to save time", not "while we're here", not as a preview.
+- **Do not** treat a "[No preference]" answer, silence, or a partial answer as
+  permission to move on. It is permission to do *nothing*. Ask again, more
+  narrowly, or stop and say what you are blocked on.
+- The gate word is an explicit **"ok"** (or an equally explicit "next", "weiter",
+  "go on"). Anything else — including a correction, a new fact, or a complaint —
+  keeps you on the *current* trip.
+- If the user redirects to a different trip mid-flight, the new trip becomes the
+  single current trip. Park the old one in its `trip.md` and say so in one line.
+- One trip = one batched `AskUserQuestion` at a time, about that trip only.
+  Never mix questions about several trips into one batch.
+
+The failure mode this prevents: a wall of half-finished drafts across many trips,
+each needing the user to re-load context, none of them actually signable.
+
+## The "Betrag €" columns belong to the Reisekostenstelle — hard rule
+
+**Never write a euro figure into the right-hand `Betrag €` (Inland / Ausland)
+columns of the Reiseabrechnung.** Erik, 18.8.2026: *"never put yourself anything
+in the columns Betrag Euro, that is for the Dienstreisestelle to fill in. We just
+fill in the stuff on the left."*
+
+The division of labour:
+
+| We fill (left side) | They fill (right side) |
+|---|---|
+| Datum, Abfahrt / Rückkunft, Beginn / Ende Dienstgeschäft | Frühstück / Übernachtung amounts |
+| Bemerkungen — what happened, why, meals from third parties | Summe 1–5, Auszahlungsbetrag, Gesamtreisekosten |
+| Privat-KFZ **km** | Privat-KFZ **€** (they apply the rate) |
+| "vom MPI bezahlt" description + its € (left of the money columns) | the money columns of Feld 8/9 |
+| meal checkboxes, "Verbindung der Reise mit Urlaub" | everything in Inland / Ausland |
+
+`scripts/fill_expense.py` **enforces this**: `RESERVED_BETRAG_FIELDS` lists all 58
+money-column indices and the script exits with an error if a config targets one.
+The `--allow-betrag` override exists only for the case where Erik explicitly asks
+for a figure to be placed there.
+
+Why it matters beyond tidiness: we do not know their per-diem brackets, their
+mileage rate decision, or their reductions for provided meals. A number we invent
+in those columns is an incorrect claim carried over Erik's signature.
+
+## Always name form entries by their printed label — never by index
+
+**When talking to Erik about anything on a form, use the label printed on the
+form**, exactly as it appears there. Erik, 18.8.2026: *"I do not see the numbers
+you are referring to, they do not show up in the form. Always ask about the
+entries with the entry title!"*
+
+Field indices (`79`, `126`, `tag2_beginn_dienstgeschaeft`, `RESERVED_BETRAG_FIELDS`)
+are **internal template mechanics**. They are printed nowhere, they mean nothing
+to the person signing the form, and quoting them makes a report impossible to
+check against the page.
+
+| Say this | Not this |
+|---|---|
+| "**km:** under **Fahrtkosten / Privat-KFZ**" | "field 79" |
+| "**Beginn und Ende Dienstgeschäfts** on the 17.7. row" | "tag2_beginn_dienstgeschaeft" |
+| "the **Betrag €** columns (**Inland** / **Ausland**)" | "indices 80/81" |
+| "**vom MPI bezahlt (bitte benennen)**" | "Feld 8 / index 126" |
+| "**Verbindung der Reise mit Urlaub**" | "checkbox 0" |
+
+Applies to **questions, confirmations and summaries alike** — ask "what goes in
+*Beginn und Ende Dienstgeschäfts*?", not "what should field 12 be?". Where the
+form prints a `(Feld 8)` marker next to a box, that marker is a legitimate label
+and may be used *alongside* the German title, never instead of it.
+
+Indices stay in the YAML configs, the scripts and `docs/formular_mechanik.md` —
+that is where they belong. They do not belong in conversation.
+
 ## Language
 
 - The agent **always replies in English**.
@@ -124,6 +208,15 @@ The pilot shows dates in German format in conversation when explicitly working o
 - If the user gives a weekday abbreviation with the date (e.g. "Die 29.6."), compute the actual weekday for that date and check for a match. If they disagree, flag it immediately: "29.6.2026 is a Monday (Mo), not Tuesday (Di) — did you mean 30.6. (Di)?"
 - If the user gives only a date, compute and show the weekday in the reply so the user can catch their own mistakes.
 - Apply this check to start dates, end dates, and any times that span midnight (i.e., "return at 00:00" means the next calendar day).
+
+## On uncertainty
+
+**The paperwork on disk can be out of date.** Erik talks to the Reisekostenstelle
+directly and they amend *their* copy of the Antrag (transport, dates, private
+portion) without it coming back to the folder. So a mismatch between what Erik
+says and what the scanned Antrag shows is **not** evidence he did something
+irregular. Ask "was that cleared with the Reisestelle?" and take his answer as
+authoritative. Note the difference in `trip.md` for the record, and move on.
 
 ## On uncertainty
 
