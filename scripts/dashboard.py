@@ -76,6 +76,19 @@ def talk_label(typ):
     return TALK_TYPES.get(key, (typ.strip().capitalize(), "talk"))
 
 
+PHASES = [
+    ("behind",    "Im Verzug",           "late or missing — and it is on Erik"),
+    ("todo",      "Zu erledigen",        "action needed, not late yet"),
+    ("waiting",   "Bei der Reisestelle", "handed in / applied — waiting on them"),
+    ("unclear",   "Status unklar",       "imported from old files — state unverified"),
+    ("planned",   "Geplant",             "future trip, nothing due yet"),
+    ("cancelled", "Nicht angetreten",    "trip did not happen"),
+    ("done",      "Erledigt",            "closed, nothing outstanding"),
+]
+PHASE_ORDER = {k: i for i, (k, _, _) in enumerate(PHASES)}
+PHASE_LABEL = {k: lab for k, lab, _ in PHASES}
+INACTIVE_PHASES = {"done", "cancelled"}
+
 MILESTONE_LABELS = [
     ("antrag_gestellt", "Antrag"),
     ("antrag_genehmigt", "Genehmigt"),
@@ -160,9 +173,15 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
 
     if not closed:
         # Abrechnung deadline
+        backlog = is_true(h.get("backlog_imported"))
+        unknown_abr = m.get("abrechnung_eingereicht") in (None, "")
         if af and not ms("abrechnung_eingereicht") and not ms("erstattet"):
             d = (af - today).days
-            if d < 0:
+            if d < 0 and backlog and unknown_abr:
+                # Imported from old files: we have no evidence either way, and a
+                # year-old "überfällig" drowns out the trips that really are late.
+                alerts.append(("warn", f"Abrechnung: Status unklar (Frist war vor {-d} d)"))
+            elif d < 0:
                 alerts.append(("overdue", f"Abrechnung überfällig ({-d} d)"))
             elif d <= ABRECHNUNG_WARN_DAYS:
                 alerts.append(("warn", f"Abrechnung fällig in {d} d"))
@@ -176,6 +195,9 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
                 alerts.append(("warn", "Antrag noch nicht genehmigt"))
             elif 0 <= d <= ANTRAG_WARN_DAYS and not ms("antrag_gestellt"):
                 alerts.append(("warn", f"Antrag fehlt (Reise in {d} d)"))
+            elif not ms("antrag_gestellt"):
+                # Far out, but still worth seeing: no application exists yet.
+                alerts.append(("info", f"kein Antrag (Reise in {d} d)"))
 
         # Awaiting reimbursement
         if ms("abrechnung_eingereicht") and not ms("erstattet"):
@@ -201,7 +223,55 @@ def build_trip(path: Path, root: Path, today: dt.date) -> dict:
                     alerts.append(("warn", f"{label}-Frist in {d} d"))
 
     severity = max((SEV[l] for l, _ in alerts), default=0)
+    levels = {l for l, _ in alerts}
+
+    # --- phase: what is the trip actually waiting on, and on whom? ----------
+    if status == "cancelled":
+        phase = "cancelled"
+    elif closed:
+        phase = "done"
+    elif status == "open-unsure":
+        phase = "unclear"
+    elif "overdue" in levels:
+        phase = "behind"
+    elif "warn" in levels:
+        phase = "todo"
+    elif ms("abrechnung_eingereicht") and not ms("erstattet"):
+        phase = "waiting"
+    elif ms("antrag_gestellt") and not ms("antrag_genehmigt"):
+        phase = "waiting"
+    else:
+        phase = "planned"
+
+    # --- the single next step, in plain words ------------------------------
+    travelled = ms("event_stattgefunden") or (end and end < today)
+    if phase == "cancelled":
+        action = "—"
+    elif phase == "done":
+        action = "—"
+    elif not ms("antrag_gestellt") and travelled:
+        action = "Antrag fehlt — mit der Reisestelle klären"
+    elif not ms("antrag_gestellt"):
+        action = "Dienstreiseantrag bauen, unterschreiben, an travel@mpi-susmat.de"
+    elif travelled and not ms("abrechnung_eingereicht"):
+        action = "Reiseabrechnung bauen und einreichen"
+    elif ms("abrechnung_eingereicht") and not ms("erstattet"):
+        action = "nichts — Reisestelle rechnet ab"
+    elif not ms("antrag_genehmigt"):
+        action = "nichts — Genehmigung abwarten"
+    elif abstract and not abstract_in:
+        action = "Abstract einreichen"
+    elif (eb or reg) and not angemeldet:
+        action = "anmelden"
+    elif not travelled:
+        action = "nichts — Reise steht an"
+    else:
+        action = "—"
+
     return {
+        "phase": phase,
+        "phase_label": PHASE_LABEL[phase],
+        "action": action,
         "folder": path.parent.name,
         "relpath": str(path.parent.relative_to(root)) if path.parent != root else ".",
         "event": str(h.get("event") or "").strip() or path.parent.name,
@@ -231,11 +301,11 @@ def sort_trips(trips):
     """Action-first: needs-attention (by severity, soonest first), then upcoming,
     then closed (most recent first)."""
     far = dt.date.max
-    active = [t for t in trips if t["status"] != "closed"]
-    closed = [t for t in trips if t["status"] == "closed"]
-    active.sort(key=lambda t: (-t["severity"], t["start"] or far))
-    closed.sort(key=lambda t: (t["start"] or dt.date.min), reverse=True)
-    return active + closed
+    active = [t for t in trips if t["phase"] not in INACTIVE_PHASES]
+    done = [t for t in trips if t["phase"] in INACTIVE_PHASES]
+    active.sort(key=lambda t: (PHASE_ORDER[t["phase"]], -t["severity"], t["start"] or far))
+    done.sort(key=lambda t: (PHASE_ORDER[t["phase"]], t["start"] or dt.date.min))
+    return active + done
 
 
 # ----------------------------------------------------------------------------- rendering: shared
@@ -252,11 +322,24 @@ def fmt_range(t) -> str:
 # ----------------------------------------------------------------------------- rendering: text
 
 def render_text(trips, today) -> str:
-    out = [f"Travel Forms — dashboard ({today.isoformat()}), {len(trips)} trips", "=" * 78]
+    counts = {}
+    for t in trips:
+        counts[t["phase"]] = counts.get(t["phase"], 0) + 1
+    n_action = counts.get("behind", 0) + counts.get("todo", 0)
+    out = [f"Travel Forms — dashboard ({today.isoformat()}), {len(trips)} trips, "
+           f"{n_action} auf deinem Tisch", "=" * 78]
+    last_phase = None
     for t in sort_trips(trips):
+        if t["phase"] != last_phase:
+            last_phase = t["phase"]
+            out.append("")
+            out.append(f"--- {PHASE_LABEL[t['phase']].upper()} "
+                       f"({counts.get(t['phase'], 0)}) " + "-" * 40)
         talk = f"  [{t['talk_label']}]" if t["talk_label"] else ""
-        line = f"[{t['status']:<11}] {fmt_range(t):<26} {t['event']}{talk}"
+        line = f"{fmt_range(t):<26} {t['event']}{talk}"
         out.append(line)
+        if t["action"] and t["action"] != "—":
+            out.append(f"    -> {t['action']}")
         meta = []
         if t["ziel"]:
             meta.append(t["ziel"])
@@ -299,6 +382,22 @@ tr:last-child td{border-bottom:none}
 tr.closed{opacity:.6}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
 .badge.open{background:var(--open)}.badge.open-unsure{background:var(--unsure)}.badge.closed{background:var(--closed)}
+.badge.behind{background:var(--overdue)}
+.badge.todo{background:var(--warn)}
+.badge.waiting{background:#5b6b7c}
+.badge.planned{background:#8a93a0}
+.badge.cancelled{background:#b0b6be}
+.badge.done{background:var(--closed)}
+tr.p-behind{background:#fdf3f2}
+tr.p-behind td:first-child{box-shadow:inset 3px 0 0 var(--overdue)}
+tr.p-todo td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+tr.p-cancelled{opacity:.55}
+tr.p-cancelled .event{text-decoration:line-through}
+td.act{font-size:12.5px;max-width:230px}
+tr.p-behind td.act{color:var(--overdue);font-weight:600}
+tr.p-todo td.act{color:var(--warn)}
+.legend{color:var(--muted);font-size:12px;margin:0 0 12px}
+.legend b{color:var(--ink)}
 .event{font-weight:600}
 .talk{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;background:#eef1f5;color:var(--muted)}
 .talk.highlight{background:#efe3fb;color:#7c3aed}
@@ -324,7 +423,7 @@ function apply(){
   const f=document.querySelector('.btn.active').dataset.f;
   rows.forEach(r=>{
     const okText=r.textContent.toLowerCase().includes(term);
-    const okFilter=f==='all'||(f==='action'?r.dataset.sev>'0':r.dataset.status===f);
+    const okFilter=f==='all'||(f==='action'?(r.dataset.phase==='behind'||r.dataset.phase==='todo'):r.dataset.phase===f);
     r.style.display=(okText&&okFilter)?'':'none';
   });
 }
@@ -350,10 +449,10 @@ def esc(s) -> str:
 
 
 def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
-    counts = {"open": 0, "open-unsure": 0, "closed": 0}
+    counts = {}
     for t in trips:
-        counts[t["status"]] = counts.get(t["status"], 0) + 1
-    n_action = sum(1 for t in trips if t["severity"] > 0)
+        counts[t["phase"]] = counts.get(t["phase"], 0) + 1
+    n_action = counts.get("behind", 0) + counts.get("todo", 0)
 
     head = (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
@@ -361,18 +460,22 @@ def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
         "<title>Travel Forms — dashboard</title><style>" + CSS + "</style></head><body><div class='wrap'>"
         "<h1>Travel Forms — dashboard</h1>"
         f"<div class='sub'>Generated {esc(today.isoformat())} · scanned <code>{esc(root)}</code> · "
-        f"{len(trips)} trips · {n_action} need action · "
-        f"{counts.get('open',0)} open · {counts.get('open-unsure',0)} open-unsure · {counts.get('closed',0)} closed</div>"
+        f"{len(trips)} trips · <b>{n_action} auf deinem Tisch</b> · "
+        + " · ".join(f"{counts.get(k,0)} {lab.lower()}" for k, lab, _ in PHASES if counts.get(k))
+        + "</div>"
+        "<div class='legend'><b>Im Verzug</b> = überfällig, du bist dran · "
+        "<b>Zu erledigen</b> = fällig, noch nicht spät · "
+        "<b>Bei der Reisestelle</b> = abgegeben, die sind dran · "
+        "<b>Geplant</b> = Reise steht an · "
+        "<b>Nicht angetreten</b> · <b>Erledigt</b></div>"
         "<div class='controls'>"
         "<input id='q' placeholder='Filter trips…'>"
-        "<button class='btn active' data-f='all'>All</button>"
-        "<button class='btn' data-f='action'>Needs action</button>"
-        "<button class='btn' data-f='open'>Open</button>"
-        "<button class='btn' data-f='open-unsure'>Unsure</button>"
-        "<button class='btn' data-f='closed'>Closed</button>"
-        "</div>"
+        "<button class='btn active' data-f='all'>Alle</button>"
+        "<button class='btn' data-f='action'>Auf meinem Tisch</button>"
+        + "".join(f"<button class='btn' data-f='{k}'>{lab}</button>" for k, lab, _ in PHASES)
+        + "</div>"
         "<table><thead><tr>"
-        "<th>Trip</th><th>Dates</th><th>Status</th><th>Destination</th>"
+        "<th>Trip</th><th>Dates</th><th>Phase</th><th>Nächster Schritt</th><th>Destination</th>"
         "<th>Trip&nbsp;#</th><th>Abrechnungsfrist</th><th>Abstract</th><th>Registration</th>"
         "<th>Alerts</th><th>Milestones</th></tr></thead><tbody>"
     )
@@ -416,11 +519,14 @@ def render_html(trips, today, root: Path, hidden_closed: int = 0) -> str:
         )
         zweck = f"<div class='muted'>{esc(t['zweck'])}</div>" if t["zweck"] else ""
         rows.append(
-            f"<tr class='{esc(t['status'])}' data-status='{esc(t['status'])}' data-sev='{t['severity']}'>"
+            f"<tr class='p-{esc(t['phase'])}' data-phase='{esc(t['phase'])}' "
+            f"data-status='{esc(t['status'])}' data-sev='{t['severity']}'>"
             f"<td data-k='{esc(t['event'].lower())}'><span class='event'>{esc(t['event'])}</span>{talk_badge}"
             f"<div class='muted'>{esc(t['relpath'])}</div>{zweck}</td>"
             f"<td data-k='{esc(start_k)}'>{esc(fmt_range(t))}</td>"
-            f"<td data-k='{esc(t['status'])}'><span class='badge {esc(t['status'])}'>{esc(t['status'])}</span></td>"
+            f"<td data-k='{PHASE_ORDER[t['phase']]}'>"
+            f"<span class='badge {esc(t['phase'])}'>{esc(t['phase_label'])}</span></td>"
+            f"<td class='act'>{esc(t['action'])}</td>"
             f"<td>{esc(t['ziel'] or '—')}</td>"
             f"<td>{esc(t['reisenummer'] or '—')}</td>"
             f"<td data-k='{esc(t['af'].isoformat() if t['af'] else '')}'>{esc(af_txt)}</td>"
@@ -484,7 +590,7 @@ def main():
         out = Path(args.output) if args.output else root / "dashboard.html"
         out.write_text(render_html(trips, today, root, hidden_closed), encoding="utf-8")
         print(f"\nDashboard written: {out}  ({len(trips)} trips, "
-              f"{sum(1 for t in trips if t['severity'] > 0)} need action)")
+              f"{sum(1 for t in trips if t['phase'] in ('behind','todo'))} auf deinem Tisch)")
         if args.open_:
             import webbrowser
             webbrowser.open(out.as_uri())

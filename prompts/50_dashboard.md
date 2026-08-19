@@ -67,3 +67,32 @@ deadline first), then upcoming trips, then `closed` ones last.
 
 The dashboard only shows trips that have a `trip.md`. Old folders show up once
 they've been imported with `backlog_trip.py` (see `prompts/40_backlog.md`).
+
+## Phases replace the raw `status` in the view (19 Aug 2026)
+
+The dashboard no longer shows `status:` directly — it derives a **phase** from the
+milestones and the dates, because "open" told the user nothing about who was
+blocked on what:
+
+| Phase | Meaning |
+|---|---|
+| `behind` | overdue and it is on Erik — rendered red |
+| `todo` | action needed, not late yet |
+| `waiting` | handed in / applied — the Reisestelle is next |
+| `unclear` | `status: open-unsure`, i.e. a backlog import whose state is unverified |
+| `planned` | future trip, nothing due |
+| `cancelled` | applied for but not travelled |
+| `done` | closed |
+
+Only `behind` + `todo` count as "auf deinem Tisch". A backlog import with a blank
+`abrechnung_eingereicht` gets "Status unklar (Frist war vor N d)" at warn level,
+**not** "überfällig" — unknown is not the same as late, and treating it as late
+buried the trips that really were overdue.
+
+Every row also carries a plain-language **Nächster Schritt**.
+
+## The dashboard is only as good as `trip.md`
+
+It reads nothing but `trip.md`. If an entry looks wrong, the file is usually
+stale, not the script — run `scripts/audit_trips.py <trips-root>` to see where
+the headers disagree with the folders.

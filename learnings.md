@@ -273,3 +273,85 @@ What the rename touched, and what it did not:
 The installed `travel-forms-pilot` skill is a separate copy: after editing
 `skill/SKILL.md` in the repo, the account-level skill has to be re-synced or a
 cloud session will keep loading the old text.
+
+## Backlog import + dashboard phases (19 Aug 2026)
+
+**`backlog_trip.py`: approval vs. settlement is now decided by the document, not
+the filename.** The highest-value open fix from 18.8. is done. `classify()` sends
+`Bitzek_*_DR####_*.pdf` to `2_Application` (it is the approved Antrag scanned
+back, not a settlement), and `looks_like_settlement()` reads the PDF: a real
+settlement says *Reisekostenabrechnung* / *Auszahlungsbetrag* / *Erstattungs-
+betrag*, an application still says *Antrag auf Genehmigung einer Dienstreise*.
+A scan with no text layer returns False — unknown, never "reimbursed".
+Consequence: nothing is ever marked `erstattet` from a filename again.
+
+**`extract_app_fields` reads more than page 1.** An untrimmed application is 8
+pages with an INDEX on page 1 and the form on page 2, so page-1-only extraction
+returned nothing usable. It now scans pages 1–3 and takes the one carrying
+`Reisezweck:`.
+
+**Unknown is not the same as late — the dashboard needed a sixth phase.** After
+importing eight 2025 trips, four of them showed as "Abrechnung überfällig
+(387 d)" purely because the milestone was blank. That buried the five 2026 trips
+that really are overdue. Backlog imports (`status: open-unsure`) now land in a
+`unclear` / **Status unklar** phase and their deadline alert reads "Status unklar
+(Frist war vor N d)" at warn level. The urgent count is `behind + todo` only.
+
+**Dashboard phases** replace the raw `status` in the UI, derived from milestones
+plus dates: `behind` (red, overdue, on Erik) → `todo` → `waiting` (with the
+Reisestelle, nothing to do) → `unclear` → `planned` → `cancelled` → `done`. Each
+row also carries a plain-language **Nächster Schritt**. Erik, 19.8.2026: *"the
+'open' is a bit misleading. I just handed in the forms for lots of DR, I just
+haven't gotten the response yet."* A status that does not say who is blocked on
+what is not a status.
+
+**New `status:` value `cancelled`** for trips that were applied for but not
+travelled (DFG-Jahresversammlung Bonn 2026, DR6229).
+
+**What the importer does NOT get right, every time:** the `event` name comes from
+splitting the folder name and is usually wrong ("Japan", "SYMPOSIUM KIT", "SFB
+Proposal"). Budget a pass over `event:` and `ziel:` after every batch import.
+Flight/hotel *comparison* PDFs (several variants of the same route) are left at
+the top level by design — they are not bookings and need a human decision.
+
+## trip.md drifts from the folder — audit it, don't trust it (19 Aug 2026)
+
+Erik, 19.8.2026: *"Cargese has an ok-ed DR Application! what didn't work for
+that case?"* The dashboard had been reporting "Antrag fehlt, Reise in 18 Tagen"
+for a trip whose **approval had been in `2_Application/` since 28 May 2026**.
+
+Nothing was misfiled. The failure was structural: `trip.md` is written by hand
+and by the agent, the dashboard reads only `trip.md`, and **nothing compared it
+against the files on disk**. An approval arrives, gets filed correctly, and the
+milestone stays `false` forever.
+
+Two things made it invisible for months:
+
+- The file was named `…_Dienstreiseantrag_ok.pdf`, not
+  `Bitzek_6568_DR####_…pdf`, so the Reisenummer was not in the filename.
+  The Reisestelle uses **both** conventions — match on `_ok.pdf` as well.
+- The number was **handwritten** (6158) on a flattened scan, so `pdftotext`
+  returned "4". Reading it needed rendering the page and looking at it. That is
+  a legitimate exception to "don't re-inspect PDFs": the rule is about not
+  re-checking *deterministic output we just generated*, not about refusing to
+  read a scan.
+
+**`scripts/audit_trips.py` now exists** and is read-only: it reconciles every
+`trip.md` against its folder and prints only the disagreements. Run it after any
+batch import and whenever a dashboard entry looks wrong. It found five on the
+first pass — Cargèse (DR6158) and DPG Regensburg 2027 were genuine gaps.
+
+**Two heuristics that seemed obvious and were wrong**, both caught by running the
+audit and reading its output critically instead of trusting it:
+
+1. Searching PDF text for *"wird wie beantragt genehmigt"* to detect approval.
+   That sentence is **printed on every blank form** in the Bearbeitungsvermerke
+   block, so it marked four unapproved applications as approved. Approval is
+   decided by filename only.
+2. Looking for `signedEB` anywhere in the folder as evidence of a submitted
+   application. Königswinter has a signed *Reiseabrechnung* in
+   `5_Expense_Report/`, which is not an application. Scope the check to
+   `2_Application/`.
+
+An audit that reports confident false positives is worse than none — check its
+findings against the actual files before acting on them.
